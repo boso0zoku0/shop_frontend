@@ -6,7 +6,6 @@ import {Link} from 'react-router-dom';
 const RegistrationForm = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
 
   const handleSubmit = async (event) => {
@@ -14,8 +13,8 @@ const RegistrationForm = () => {
 
     try {
       const response = await axios.post(
-        'http://127.0.0.1:8000/auth/registrations/',
-        {username, password, email}, // Данные отправляются в формате JSON
+        'http://127.0.0.1:8000/auth/registrations',
+        {username, password}, // Данные отправляются в формате JSON
         {
           headers: {
             'Content-Type': 'application/json', // Новый заголовок
@@ -73,13 +72,6 @@ const RegistrationForm = () => {
           <label htmlFor="email" className="text-white p-2 font-poppins">
             Email:
           </label>
-          <input
-            type="email"
-            id="email"
-            required
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-64 p-2 border rounded-md border-pink-700"
-          />
           <button type="submit" className="w-64 p-2 bg-blue-500 hover:bg-indigo-600 text-white rounded-md focus:ring-3">
             Зарегистрироваться
           </button>

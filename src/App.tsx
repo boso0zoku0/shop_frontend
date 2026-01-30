@@ -5,8 +5,9 @@ import Genres from "./components/shop/ListGenres.tsx";
 import ActionGames from "./components/shop/GamesAction.tsx";
 import StrategyGames from "./components/shop/GamesStrategy.tsx";
 import RpgGames from "./components/shop/GamesRpg.tsx"
-import MyAccount from "./components/shop/MyAccount.tsx";
 import ChatWebsocket from "./components/shop/websockets/App.tsx";
+import RegistrationUsers from "./components/shop/Auth/Registration.tsx";
+import LoginUsers from "./components/shop/Auth/Login.tsx";
 
 export default function App() {
   return (
@@ -21,11 +22,16 @@ export default function App() {
             </li>
             <li className="text-sky-200 text-shadow-2xs text-shadow-sky-500 font-thick"><a href="/ws">Chat</a>
             </li>
+            <li className="text-sky-200 text-shadow-2xs text-shadow-sky-500 font-thick"><a href="/registration">Registration</a>
+            </li>
+            <li className="text-sky-200 text-shadow-2xs text-shadow-sky-500 font-thick"><a href="/Login">Login</a>
+            </li>
 
           </ul>
         </nav>
         <Routes>
-          <Route path="/account" element={<MyAccount/>}/>
+          <Route path="/login" element={<LoginUsers/>}/>
+          <Route path="/registration" element={<RegistrationUsers/>}/>
           <Route path="/games" element={<MainPage/>}/>
           <Route path="/genres" element={<Genres/>}/>
           <Route path="/games/action" element={<ActionGames/>}/>
