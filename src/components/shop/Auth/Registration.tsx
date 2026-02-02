@@ -21,7 +21,8 @@ export default function RegistrationUsers( ) {
           'Content-Type': 'multipart/form-data',
         }
       }
-    );
+    )
+    localStorage.setItem("cookie_session_id", resp.data.cookie_session_id)
     if (resp.status <= 201) {
       setPassword('')
       setUsername('')

@@ -20,7 +20,7 @@ export default function App() {
             </li>
             <li className="text-sky-200 text-shadow-2xs text-shadow-sky-500 font-thick"><a href="/account">Account</a>
             </li>
-            <li className="text-sky-200 text-shadow-2xs text-shadow-sky-500 font-thick"><a href="/ws">Chat</a>
+            <li className="text-sky-200 text-shadow-2xs text-shadow-sky-500 font-thick"><a href="/ws">Support-Chat</a>
             </li>
             <li className="text-sky-200 text-shadow-2xs text-shadow-sky-500 font-thick"><a href="/registration">Registration</a>
             </li>
