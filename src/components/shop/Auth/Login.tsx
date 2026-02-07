@@ -2,6 +2,7 @@ import React, {useState} from 'react';
 import {Lock, User} from 'lucide-react';
 import {Link, useNavigate} from "react-router-dom";
 import axios from "axios";
+import {setSessionCookie} from "../cookieHelper.tsx";
 
 export default function LoginUsers( ) {
   const [username, setUsername] = useState('');
@@ -14,15 +15,17 @@ export default function LoginUsers( ) {
     formData.append('username', username)
     formData.append('password', password)
     const resp = await axios.post(
-      'http://127.0.0.1:8000/auth/login',
+      'http://localhost:8000/auth/login',
       formData,
       {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        }
-      }
+      headers: { 'Content-Type': 'multipart/form-data' },
+      withCredentials: true  // ← Добавьте это!
+    }
     )
-    localStorage.setItem("cookie_session_id", resp.data.cookie_update_session_id);
+    if (resp.data.cookie_session_id) {
+        setSessionCookie(resp.data.cookie_session_id);
+        alert('Вход выполнен успешно!');
+      }
     if (resp.status <= 201) {
       setPassword('')
       setUsername('')

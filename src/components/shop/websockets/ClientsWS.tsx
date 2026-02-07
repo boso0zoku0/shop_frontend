@@ -1,6 +1,7 @@
 import {useState, useEffect, useRef} from 'react';
 import {Send, X, Wifi, WifiOff, User} from 'lucide-react';
 import axios from "axios";
+import {getSessionId, setSessionCookie} from "../cookieHelper.tsx";
 
 // Интерфейс для описания структуры сообщения
 interface Message {
@@ -21,6 +22,7 @@ interface ChatWindowProps {
 export function ClientsWS({isOpen, onClose}: ChatWindowProps) {
   // Состояние: массив всех сообщений в чате
   const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesChat, setMessagesChat] = useState('')
 
   // Состояние: текущее значение в поле ввода
   const [inputValue, setInputValue] = useState('');
@@ -67,28 +69,29 @@ export function ClientsWS({isOpen, onClose}: ChatWindowProps) {
     }
   }, [isOpen]);
 
+  // Функция для получения username по cookie
   async function userByCookie() {
-    const session_id = localStorage.getItem('cookie_session_id');
+    const session_id = getSessionId();
     if (!session_id) {
       alert('Please login first');
       return null;
     }
 
-    // Устанавливаем куку перед запросом
-    document.cookie = `session_id=${session_id}; path=/; SameSite=Lax`;
+    // ВАЖНО: Устанавливаем куку перед запросом
+    // Браузер автоматически отправит её с запросом благодаря withCredentials: true
+    setSessionCookie(session_id);
 
     try {
       const response = await axios.get(
-        'http://127.0.0.1:8000/auth/user-by-cookie',
+        'http://localhost:8000/auth/user-by-cookie',
         {
-          withCredentials: true
-        },
-
+          withCredentials: true,  // Браузер отправит куки автоматически
+        }
       );
 
       return response.data.username;
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Axios error:', error.response?.data || error.message);
       alert(`Error: ${error.response?.data?.detail || error.message}`);
       return null;
@@ -116,26 +119,57 @@ export function ClientsWS({isOpen, onClose}: ChatWindowProps) {
 
       // Обработчик события: получено сообщение от сервера
       websocket.onmessage = (event) => {
+        // console.log(event.data)
         try {
           // Клиент получает JSON от оператора
           const data = JSON.parse(event.data);
 
+
           // Проверяем тип сообщения от оператора
           if (data.type === "operator_message") {
-            // Создаем объект сообщения для отображения
+            // Сообщение от оператора клиенту
             const newMessage: Message = {
-              id: Date.now().toString() + Math.random(),  // Генерируем уникальный ID
-              message: data.message,                          // Текст от оператора
-              username: 'Оператор',                        // Отправитель - оператор
-              timestamp: new Date(),                       // Текущее время
-              isOwn: false                                 // Это не наше сообщение
+              id: Date.now().toString() + Math.random(),
+              message: data.message,
+              username: 'Оператор',
+              timestamp: new Date(),
+              isOwn: false  // Сообщение от оператора, не наше
             };
 
             // Добавляем сообщение в массив сообщений
             setMessages(prev => [...prev, newMessage]);
+
+          } else if (data.type === "greeting") {
+            // Приветственное сообщение от системы
+            const newMessage: Message = {
+              id: Date.now().toString() + Math.random(),
+              message: data.message,
+              username: 'Система',  // Отправитель - система
+              timestamp: new Date(),
+              isOwn: false  // Это системное сообщение
+            };
+
+            setMessages(prev => [...prev, newMessage]);
+          } else if (data.type === "advertising") {
+            const newMessage: Message = {
+              id: Date.now().toString() + Math.random(),
+              message: data.message,
+              username: 'Система',  // Отправитель - система
+              timestamp: new Date(),
+              isOwn: false  // Это системное сообщение
+            };
+            setMessages(prev => [...prev, newMessage])
           }
+
         } catch (error) {
-          console.error('Ошибка обработки сообщения:', error);
+          const newMessage: Message = {
+            id: Date.now().toString() + Math.random(),
+            message: event.data.message,  // Используем как есть
+            username: event.data.includes("Subscribe") ? 'Система' : 'Оператор',
+            timestamp: new Date(),
+            isOwn: false
+          };
+          setMessages(prev => [...prev, newMessage]);
         }
       };
 

@@ -86,7 +86,7 @@ export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
     }
 
     // Подключаемся к эндпоинту оператора
-    const websocket = new WebSocket(`ws://localhost:8000/operator/${operatorName}`);
+    const websocket = new WebSocket(`ws://localhost:8000/operator/${operatorName}/anna`);
 
     // Обработчик события: соединение установлено
     websocket.onopen = () => {
@@ -102,8 +102,8 @@ export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
         const data = JSON.parse(event.data);
         if (data.type === 'notify_to_connection') {
           setNotifyConnect({
-            message: `Клиент ${data.client_id} подключился к чату`,
-            type: 'Notify to connection',
+            message: data.message,
+            type: 'client_connected',
             client_id: data.client_id,
             timestamp: new Date(),
           })
@@ -336,7 +336,7 @@ export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
 
         {/* ОСНОВНАЯ ОБЛАСТЬ ЧАТА */}
         <div className="flex-1 flex flex-col">
-          {notifyConnect ? <div>COnnect</div> : ''}
+          {notifyConnect ? <div>Connect</div> : ''}
           {/* Header основной области */}
           <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between">
             <div>
