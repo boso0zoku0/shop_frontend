@@ -22,7 +22,6 @@ interface ChatWindowProps {
 export function ClientsWS({isOpen, onClose}: ChatWindowProps) {
   // Состояние: массив всех сообщений в чате
   const [messages, setMessages] = useState<Message[]>([]);
-  const [messagesChat, setMessagesChat] = useState('')
 
   // Состояние: текущее значение в поле ввода
   const [inputValue, setInputValue] = useState('');
@@ -123,22 +122,36 @@ export function ClientsWS({isOpen, onClose}: ChatWindowProps) {
         try {
           // Клиент получает JSON от оператора
           const data = JSON.parse(event.data);
+          let displayText = '';
 
-
-          // Проверяем тип сообщения от оператора
-          if (data.type === "operator_message") {
-            // Сообщение от оператора клиенту
-            const newMessage: Message = {
-              id: Date.now().toString() + Math.random(),
-              message: data.message,
-              username: 'Оператор',
-              timestamp: new Date(),
-              isOwn: false  // Сообщение от оператора, не наше
+          if (data.type === "operator_message" || data.type === "notify") {
+            // Функция для извлечения текста из возможного JSON
+            const extractText = (input: any): string => {
+              if (typeof input === 'string') {
+                try {
+                  const parsed = JSON.parse(input);
+                  // Рекурсивно извлекаем из поля message
+                  return extractText(parsed.message || input);
+                } catch {
+                  return input; // Не JSON, возвращаем как есть
+                }
+              } else if (input && typeof input === 'object') {
+                return extractText(input.message || JSON.stringify(input));
+              }
+              return String(input);
             };
 
-            // Добавляем сообщение в массив сообщений
-            setMessages(prev => [...prev, newMessage]);
+            displayText = extractText(data.message);
 
+            const newMessage = {
+              id: Date.now().toString() + Math.random(),
+              message: displayText, // ✅ Только текст
+              username: 'Оператор',
+              timestamp: new Date(),
+              isOwn: false
+            };
+
+            setMessages(prev => [...prev, newMessage]);
           } else if (data.type === "greeting") {
             // Приветственное сообщение от системы
             const newMessage: Message = {
@@ -148,8 +161,8 @@ export function ClientsWS({isOpen, onClose}: ChatWindowProps) {
               timestamp: new Date(),
               isOwn: false  // Это системное сообщение
             };
-
             setMessages(prev => [...prev, newMessage]);
+
           } else if (data.type === "advertising") {
             const newMessage: Message = {
               id: Date.now().toString() + Math.random(),
@@ -169,6 +182,7 @@ export function ClientsWS({isOpen, onClose}: ChatWindowProps) {
             timestamp: new Date(),
             isOwn: false
           };
+
           setMessages(prev => [...prev, newMessage]);
         }
       };
@@ -306,77 +320,78 @@ export function ClientsWS({isOpen, onClose}: ChatWindowProps) {
           // ИНТЕРФЕЙС ЧАТА (показывается после входа)
           <>
             {/* Область сообщений */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-              {messages.length === 0 ? (
-                // Пустое состояние (нет сообщений)
-                <div className="h-full flex items-center justify-center text-gray-400">
-                  <div className="text-center">
-                    <div className="text-4xl mb-2">💬</div>
-                    <p>Сообщений пока нет</p>
-                    <p className="text-sm">Начните разговор!</p>
-                  </div>
-                </div>
-              ) : (
-                // Список сообщений
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    // Свои сообщения справа, чужие слева
-                    className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      // Разные стили для своих и чужих сообщений
-                      className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                        message.isOwn
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-br-sm'  // Свои: синий фон
-                          : 'bg-white text-gray-800 rounded-bl-sm shadow-sm'  // Чужие: белый фон
-                      }`}
-                    >
-                      {/* Имя отправителя (только для чужих сообщений) */}
-                      {!message.isOwn && (
-                        <div className="text-xs font-semibold mb-1 opacity-70">
-                          {message.username}
-                        </div>
-                      )}
-                      {/* Текст сообщения */}
-                      <div className="break-words">{message.message}</div>
-                      {/* Время отправки */}
-                      <div className={`text-xs mt-1 ${message.isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
-                        {message.timestamp.toLocaleTimeString('ru-RU', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                {messages.length === 0 ? (
+                  // Пустое состояние (нет сообщений)
+                  <div className="h-full flex items-center justify-center text-gray-400">
+                    <div className="text-center">
+                      <div className="text-4xl mb-2">💬</div>
+                      <p>Сообщений пока нет</p>
+                      <p className="text-sm">Начните разговор!</p>
                     </div>
                   </div>
-                ))
-              )}
-              {/* Невидимый div для автоматической прокрутки */}
-              <div ref={messagesEndRef}/>
-            </div>
+                ) : (
+                  // Список сообщений
+                  messages.map((message) => (
 
-            {/* Поле ввода сообщения */}
-            <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200">
-              <div className="flex gap-2">
-                {/* Текстовое поле */}
-                <input
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder="Напишите сообщение..."
-                  disabled={!isConnected}  // Отключаем если нет соединения
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900"
-                />
-                {/* Кнопка отправки */}
-                <button
-                  type="submit"
-                  disabled={!isConnected || !inputValue.trim()}  // Отключаем если нет соединения или пустое поле
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <Send className="w-5 h-5"/>
-                </button>
+                    <div
+                      key={message.id}
+                      // Свои сообщения справа, чужие слева
+                      className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        // Разные стили для своих и чужих сообщений
+                        className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                          message.isOwn
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-br-sm'  // Свои: синий фон
+                            : 'bg-white text-gray-800 rounded-bl-sm shadow-sm'  // Чужие: белый фон
+                        }`}
+                      >
+                        {/* Имя отправителя (только для чужих сообщений) */}
+                        {!message.isOwn && (
+                          <div className="text-xs font-semibold mb-1 opacity-70">
+                            {message.username}
+                          </div>
+                        )}
+                        {/* Текст сообщения */}
+                        <div className="break-words">{message.message}</div>
+                        {/* Время отправки */}
+                        <div className={`text-xs mt-1 ${message.isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
+                          {message.timestamp.toLocaleTimeString('ru-RU', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+                {/* Невидимый div для автоматической прокрутки */}
+                <div ref={messagesEndRef}/>
               </div>
-            </form>
+
+              {/* Поле ввода сообщения */}
+              <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200">
+                <div className="flex gap-2">
+                  {/* Текстовое поле */}
+                  <input
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    placeholder="Напишите сообщение..."
+                    disabled={!isConnected}  // Отключаем если нет соединения
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900"
+                  />
+                  {/* Кнопка отправки */}
+                  <button
+                    type="submit"
+                    disabled={!isConnected || !inputValue.trim()}  // Отключаем если нет соединения или пустое поле
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Send className="w-5 h-5"/>
+                  </button>
+                </div>
+              </form>
           </>
         )}
       </div>
