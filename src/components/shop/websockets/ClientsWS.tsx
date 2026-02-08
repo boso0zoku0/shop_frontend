@@ -105,9 +105,9 @@ export function ClientsWS({isOpen, onClose}: ChatWindowProps) {
         return;
       }
 
-      const client_id = await userByCookie()
+      const client = await userByCookie()
       console.log('User:', username);
-      const websocket = new WebSocket(`ws://localhost:8000/clients/${client_id}`);
+      const websocket = new WebSocket(`ws://localhost:8000/clients/${client}`);
 
       // Обработчик события: соединение установлено
       websocket.onopen = () => {

@@ -45,7 +45,7 @@ const Notification = ({ notification, onClose }) => {
               {notification.type}
             </h4>
             <p className="text-sm text-gray-600 mt-1">
-              Client <span className="font-medium">{notification.client_id}</span> has joined
+              Client <span className="font-medium">{notification.client}</span> has joined
             </p>
           </div>
         </div>

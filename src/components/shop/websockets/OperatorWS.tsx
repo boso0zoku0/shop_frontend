@@ -4,7 +4,7 @@ import NotificationToast from "./NotificationToast.tsx";
 
 // Интерфейс для описания структуры сообщения оператора
 interface Message {
-  client_id: string;      // ID клиента, с которым связано сообщение
+  client: string;      // ID клиента, с которым связано сообщение
   message: string;        // Текст сообщения
   timestamp: Date;        // Время отправки
   fromOperator: boolean;  // Флаг: отправлено ли сообщение оператором (true) или получено от клиента (false)
@@ -12,7 +12,7 @@ interface Message {
 
 // Тип для хранения сообщений: ключ - ID клиента, значение - массив сообщений
 interface ClientMessages {
-  [client_id: string]: Message[];
+  [client: string]: Message[];
 }
 
 // Пропсы для компонента панели оператора
@@ -90,7 +90,7 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
     }
 
     // Подключаемся к эндпоинту оператора
-    const websocket = new WebSocket(`ws://localhost:8000/operator/${operatorName}/${selectedClient}`);
+    const websocket = new WebSocket(`ws://localhost:8000/operator/${operatorName}/anna`);
 
     // Обработчик события: соединение установлено
     websocket.onopen = () => {
@@ -104,19 +104,28 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
       try {
         // Оператор получает JSON с информацией о клиенте и его сообщении
         const data = JSON.parse(event.data);
-        if (data.type === 'notify_to_connection') {
+        if (data.type === 'client_message') {
           setNotifyConnect({
-            message: data.message,
             type: 'client_connected',
-            client_id: data.client_id,
-            timestamp: new Date(),
+            client: data.client,
           })
-        }
-        // Проверяем что есть client_id и message (это сообщение от клиента)
-        if (data.client_id && data.message) {
+          const newMessage: Message = {
+            client: data.client,  // От кого пришло
+            message: data.message,       // Текст
+            timestamp: new Date(),       // Текущее время
+            fromOperator: false          // Это сообщение ОТ клиента (не от оператора)
+          }
+
+        // Добавляем сообщение в историю конкретного клиента
+          setMessages(prev => ({
+            ...prev,  // Сохраняем все предыдущие чаты
+            [data.client]: [...(prev[data.client] || []), newMessage]  // Добавляем новое сообщение к истории клиента
+          }))}
+        // Проверяем что есть client и message (это сообщение от клиента)
+        if (data.client && data.message) {
           // Создаем объект сообщения
           const newMessage: Message = {
-            client_id: data.client_id,  // От кого пришло
+            client: data.client,  // От кого пришло
             message: data.message,       // Текст
             timestamp: new Date(),       // Текущее время
             fromOperator: false          // Это сообщение ОТ клиента (не от оператора)
@@ -126,12 +135,12 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
           // Добавляем сообщение в историю конкретного клиента
           setMessages(prev => ({
             ...prev,  // Сохраняем все предыдущие чаты
-            [data.client_id]: [...(prev[data.client_id] || []), newMessage]  // Добавляем новое сообщение к истории клиента
+            [data.client]: [...(prev[data.client] || []), newMessage]  // Добавляем новое сообщение к истории клиента
           }));
 
           // Если не выбран никакой клиент, автоматически выбираем того, кто написал
           if (!selectedClient) {
-            setSelectedClient(data.client_id);
+            setSelectedClient(data.client);
           }
         }
       } catch (error) {
@@ -163,18 +172,19 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
     if (!inputValue.trim() || !ws || !isConnected || !selectedClient) return;
 
     // Формируем JSON для отправки оператором
-    // Бэкенд ожидает: { target_client_id: string, message: string }
+    // Бэкенд ожидает: { client: string, message: string }
     const messageData = {
-      client_id: selectedClient,  // Кому отправляем
+      client: selectedClient,  // Кому отправляем
       message: inputValue,                // Текст сообщения
       type: "operator_message"
+
     };
 
     // Отправляем JSON на сервер
     ws.send(JSON.stringify(messageData));
     // Добавляем сообщение в локальную историю (для отображения справа)
     const newMessage: Message = {
-      client_id: selectedClient,  // С каким клиентом связано
+      client: selectedClient,  // С каким клиентом связано
       message: inputValue,        // Текст
       timestamp: new Date(),      // Время отправки
       fromOperator: true          // Это сообщение ОТ оператора
@@ -190,7 +200,7 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
     setInputValue('');
   };
 
-  // Получаем список всех client_id (ключи объекта messages)
+  // Получаем список всех client (ключи объекта messages)
   const clientList = Object.keys(messages);
 
   // Получаем массив сообщений с текущим выбранным клиентом
@@ -290,9 +300,9 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
                 ) : (
                   // Список карточек клиентов
                   <div className="space-y-1">
-                    {clientList.map((client_id) => {
+                    {clientList.map((client) => {
                       // Получаем все сообщения для этого клиента
-                      const clientMessages = messages[client_id] || [];
+                      const clientMessages = messages[client] || [];
 
                       // Получаем последнее сообщение для превью
                       const lastMessage = clientMessages[clientMessages.length - 1];
@@ -302,11 +312,11 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
 
                       return (
                         <button
-                          key={client_id}
-                          onClick={() => setSelectedClient(client_id)}  // При клике выбираем этого клиента
+                          key={client}
+                          onClick={() => setSelectedClient(client)}  // При клике выбираем этого клиента
                           // Разные стили для выбранного и невыбранного клиента
                           className={`w-full text-left p-3 rounded-lg transition-colors ${
-                            selectedClient === client_id
+                            selectedClient === client
                               ? 'bg-purple-100 border-2 border-purple-500'  // Выбранный
                               : 'bg-white hover:bg-gray-100 border-2 border-transparent'  // Невыбранный
                           }`}
@@ -314,7 +324,7 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
                           {/* Верхняя строка: имя клиента и бейдж с количеством сообщений */}
                           <div className="flex items-center justify-between mb-1">
                         <span className="font-semibold text-gray-800 truncate">
-                          {client_id}
+                          {client}
                         </span>
                             {/* Показываем бейдж только если есть непрочитанные */}
                             {unreadCount > 0 && (

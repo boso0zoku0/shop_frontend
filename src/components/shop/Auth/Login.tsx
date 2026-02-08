@@ -24,7 +24,6 @@ export default function LoginUsers( ) {
     )
     if (resp.data.cookie_session_id) {
         setSessionCookie(resp.data.cookie_session_id);
-        alert('Вход выполнен успешно!');
       }
     if (resp.status <= 201) {
       setPassword('')
