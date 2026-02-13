@@ -81,6 +81,14 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
     console.log("Choose client")
 
   }
+
+  const connectShowClients = () => {
+
+    const websocket = new WebSocket("ws://localhost:8000/operator/get-clients")
+    websocket.onopen = () => {
+      return websocket.send()
+    }
+  }
   // Функция для подключения оператора к WebSocket (вызывается при отправке формы входа)
   const connectAsOperator = () => {
     // Проверяем, что имя оператора не пустое

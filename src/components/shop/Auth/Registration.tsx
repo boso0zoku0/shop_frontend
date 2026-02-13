@@ -14,7 +14,7 @@ export default function RegistrationUsers( ) {
     formData.append('username', username)
     formData.append('password', password)
     const resp = await axios.post(
-      'http://127.0.0.1:8000/auth/registration',
+      'http://localhost:8000/auth/registration',
       formData,
       {
         headers: {

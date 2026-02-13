@@ -15,7 +15,7 @@ export default function MyAccount() {
   const [user, setUser] = useState<Account[]>([])
 
   useEffect(() => {
-    axios.get("http://127.0.0.1:8000/games/account")
+    axios.get("http://localhost:8000/games/account")
       .then(response => {
         setUser(response.data);
       })
@@ -23,20 +23,6 @@ export default function MyAccount() {
         console.error(error);
       });
   }, []);
-
-  // Моковые данные пользователя - замените на реальные данные из БД
-  // const [user] = useState({
-  //   id: 1,
-  //   username: "GamerPro2024",
-  //   email: "gamer@example.com",
-  //   avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=GamerPro",
-  //   memberSince: "2020-05-15",
-  //   totalGames: 156,
-  //   hoursPlayed: 1247,
-  //   achievements: 342,
-  //   favoriteGenre: "Action",
-  //   level: 47,
-  // });
 
 
   return (

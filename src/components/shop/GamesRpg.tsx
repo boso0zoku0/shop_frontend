@@ -20,7 +20,11 @@ export default function RpgGames() {
   useEffect(() => {
     async function fetchGames() {
       try {
-        const response = await axios.get("http://127.0.0.1:8000/games/watch/genre/rpg");
+        const response = await axios.get("http://localhost:8000/games/watch/genre/rpg",
+          {
+            withCredentials: true
+          }
+          );
         setGames(response.data);
         console.log(response.data)
       } catch (error) {

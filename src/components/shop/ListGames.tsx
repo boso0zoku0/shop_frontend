@@ -1,7 +1,8 @@
 import {useEffect, useRef, useState} from "react";
 import axios from "axios";
 import FilmGallery from "./Gallery.tsx";
-import {Rating} from 'react-simple-star-rating';
+import {useNavigate} from "react-router-dom";
+import VerticalRating from "./GameRatingProps.tsx";
 
 interface Games {
   average_rating: number;
@@ -11,79 +12,34 @@ interface Games {
   release_year: string;
   story?: string; // Делаем опциональным
   gallery?: string[];
+  game: string // с этого поля и ниже значение приходит от подзапроса отдельного
+  average_rating: number
+  rating_count: number
+  message: string
 }
 
-// interface StarsGame {
-//   game: string,
-//   stars: number
-// }
 
 export default function ListGames() {
   const [games, setGames] = useState<Games[]>([]);
   const [expandedFilmId, setExpandedFilmId] = useState<number | null>(null);
-  const [genre, setGenre] = useState('')
-  const [stars, setStars] = useState(0)
-
-
-  // useEffect(() => {
-  //   axios.get("http://127.0.0.1:8000/games/watch/genre/action")
-  //     .then(response => {
-  //       setGames(response.data);
-  //     })
-  //     .catch(error => {
-  //       console.error("Ошибка:", error);
-  //     });
-  // }, []);
-
-  // useEffect(() => {
-  //   axios.get("http://127.0.0.1:8000/games/get/rating")
-  //     .then(response => {
-  //       setGenre(response.data);
-  //     })
-  //     .catch(error => {
-  //       console.error("Ошибка:", error);
-  //     });
-  // }, []);
+  const navigate = useNavigate()
 
 
   useEffect(() => {
-    axios.get('http://127.0.0.1:8000/games/watch')
+    axios.get('http://localhost:8000/games/get/rating/all',
+      {
+        withCredentials: true
+      }
+      )
       .then(response => {
-        const gamesData = response.data;
-        console.log('Games data:', gamesData);
-
-        // Получаем рейтинги для всех игр
-        return Promise.all(
-          gamesData.map(game =>
-            axios.get("http://127.0.0.1:8000/games/ratings")
-              .then(res => {
-                const stats = res.data;
-                console.log('Stats for', game.name, ':', stats);
-
-                // ВАЖНО: stats - это МАССИВ объектов, а не один объект!
-                // Нужно найти рейтинг для конкретной игры
-                const gameStats = stats.find(s => s.game === game.name);
-
-                return {
-                  ...game,
-                  average_rating: gameStats?.average_rating || 0
-                };
-              })
-              .catch(() => ({
-                ...game,
-                average_rating: 0
-              }))
-          )
-        );
-      })
-      .then(gamesWithRatings => {
-        setGames(gamesWithRatings);
-        console.log('Games with ratings:', gamesWithRatings);
-      })
-      .catch(error => {
-        console.error('Ошибка загрузки:', error);
-      });
+        setGames(response.data)})
   }, []);
+
+
+
+  function navigateToVote(game: string) {
+    navigate(`/vote/${encodeURIComponent(game)}`)
+  }
 
 
   return (
@@ -108,20 +64,20 @@ export default function ListGames() {
                 {/* Заголовок и рейтинг в одном блоке */}
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="text-2xl font-bold">{game.name}</h2>
-
+                  <button
+                    className={"mt-4 px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg"}
+                    onClick={() => navigateToVote(game.name)}
+                  >Go To Vote!
+                  </button>
                   {/* Рейтинг справа от названия */}
                   <div className="flex items-center">
-                    <Rating
-                      initialValue={game.average_rating || 0} // От 0 до 5
-                      iconsCount={5} // Количество звезд
-                      readonly={true}
-                      allowFraction={true} // Разрешить половинки
-                      fillColor="#fbbf24"
-                      emptyColor="#d1d5db"
+
+                    <VerticalRating
+                      game={game.name}
+                      maxStars={5}
+                      initialValue={game.rating_count}
+                      onRate={(val) => console.log("Оценка:", val)}
                     />
-                    <span className="ml-2 text-lg">
-                      {game.average_rating?.toFixed(1) || '0.0'}/5.0
-                    </span>
                   </div>
                 </div>
 
@@ -163,7 +119,3 @@ export default function ListGames() {
     </div>
   );
 }
-
-
-
-

@@ -2,6 +2,7 @@ import FilmGallery from "./Gallery.tsx";
 import {useEffect, useState} from "react";
 import axios from "axios";
 import {Rating} from "react-simple-star-rating";
+import VerticalRating from "./GameRatingProps.tsx";
 
 export interface Games {
   average_rating: number;
@@ -34,10 +35,13 @@ export default function ActionGames() {
   //
   //   fetchGames();
   // }, []);
-  //
+
 
   useEffect(() => {
-    axios.get('http://127.0.0.1:8000/games/watch/genre/action')
+    axios.get('http://localhost:8000/games/watch/genre/action',
+      {
+        withCredentials: true
+      })
       .then(response => {
         const gamesData = response.data;
         console.log('Games data:', gamesData);
@@ -45,7 +49,7 @@ export default function ActionGames() {
         // Получаем рейтинги для всех игр
         return Promise.all(
           gamesData.map(game =>
-            axios.get("http://127.0.0.1:8000/games/ratings")
+            axios.get("http://localhost:8000/games/ratings")
               .then(res => {
                 const stats = res.data;
                 console.log('Stats for', game.name, ':', stats);
@@ -109,6 +113,7 @@ export default function ActionGames() {
                     <span className="ml-2 text-lg">
                     {game.average_rating?.toFixed(1) || '0.0'}/5.0
                   </span>
+
                   </div>
                 </div>
 

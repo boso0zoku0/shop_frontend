@@ -3,6 +3,7 @@ import {useEffect, useState} from "react";
 import axios from "axios";
 import {useNavigate} from "react-router-dom";
 import type {Games} from "./GamesAction.tsx";
+import {getSessionId} from "./cookieHelper.tsx";
 
 
 async function fetchGamesByGenre(genre: string): Promise<Games[]> {
@@ -33,13 +34,16 @@ export default function Genres() {
   useEffect(() => {
     async function fetchGenres() {
       try {
-        const response = await axios.get("http://127.0.0.1:8000/games/watch/genres");
+        const response = await axios.get(
+          "http://localhost:8000/games/watch/genres",
+          {
+            withCredentials: true
+          }
+          );
         setGenres(response.data);
-        console.log(response.data)
       } catch (error) {
         console.error("Error fetching films:", error);
         setGenres([]); // Устанавливаем пустой массив при ошибке
-      } finally {
       }
     }
 
@@ -59,8 +63,8 @@ export default function Genres() {
               <img
                 className="w-64 h-96 object-cover rounded-lg shadow-lg"
                 // genre.photo уже строка, убираем [0]
-                src={genre.photo || "https://via.placeholder.com/256x384"}
-                alt={genre.genre}
+                src={genre.gallery || "https://via.placeholder.com/256x384"}
+                alt={genre.gallery}
                 onClick={() => navigate(`/games/${genre.genre}`)} // /games/{genre}
               />
               {/* Просто выводим название жанра */}
