@@ -1,70 +1,48 @@
-import {useState, useEffect, useRef} from 'react';
-import {Send, X, Wifi, WifiOff, User} from 'lucide-react';
-import axios from "axios";
-import {getSessionId, setSessionCookie} from "../cookieHelper.tsx";
+import { useState, useEffect, useRef } from 'react';
+import { Send, X, Wifi, WifiOff, User } from 'lucide-react';
+import axios from 'axios';
+import { getSessionId, setSessionCookie } from '../cookieHelper';
 
-// Интерфейс для описания структуры сообщения
 interface Message {
-  id: string;           // Уникальный идентификатор сообщения
-  message: string;         // Текст сообщения
-  username: string;     // Имя отправителя
-  timestamp: Date;      // Время отправки
-  isOwn: boolean;       // Флаг: отправлено ли сообщение текущим пользователем
+  id: string;
+  message: string;
+  username: string;
+  timestamp: Date;
+  isOwn: boolean;
 }
 
-// Пропсы для компонента окна чата
-interface ChatWindowProps {
-  isOpen: boolean;      // Открыто ли окно чата
-  onClose: () => void;  // Функция для закрытия окна
+interface ClientPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-// Компонент окна чата для клиента
-export function ClientsWS({isOpen, onClose}: ChatWindowProps) {
-  // Состояние: массив всех сообщений в чате
+export function ClientsWS({ isOpen, onClose }: ClientPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
-
-  // Состояние: текущее значение в поле ввода
   const [inputValue, setInputValue] = useState('');
-
-  // Состояние: имя пользователя (вводится при входе)
-  const [username, setUsername] = useState('');
-
-  // Состояние: подключен ли WebSocket
   const [isConnected, setIsConnected] = useState(false);
-
-  // Состояние: вошел ли пользователь в чат (прошел форму входа)
-  const [hasJoined, setHasJoined] = useState(false);
-
-  // Состояние: объект WebSocket соединения
   const [ws, setWs] = useState<WebSocket | null>(null);
-
-  // Реф для автоматической прокрутки к последнему сообщению
+  const [username, setUsername] = useState('');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [hasJoined, setHasJoined] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const operator = useRef('')
 
-  // Функция для прокрутки к последнему сообщению
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Эффект: автоматически прокручиваем вниз при появлении новых сообщений
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  // Эффект: очищаем состояние и закрываем соединение при закрытии окна
   useEffect(() => {
-    if (!isOpen) {
-      // Закрываем WebSocket при закрытии окна
-      if (ws) {
-        ws.close();
-        setWs(null);
-      }
-      // Сбрасываем все состояния
+    if (!isOpen && ws) {
+      ws.close();
+      setWs(null);
       setIsConnected(false);
-      setHasJoined(false);
       setMessages([]);
+      setIsLoggedIn(false);
       setUsername('');
-      setInputValue('');
     }
   }, [isOpen]);
 
@@ -82,7 +60,7 @@ export function ClientsWS({isOpen, onClose}: ChatWindowProps) {
 
     try {
       const response = await axios.get(
-        'http://localhost:8000/auth/user-by-cookie',
+        'http://localhost:8000/auth/user-by-cookie',  // Изменено с 127.0.0.1 на localhost!
         {
           withCredentials: true,  // Браузер отправит куки автоматически
         }
@@ -99,301 +77,279 @@ export function ClientsWS({isOpen, onClose}: ChatWindowProps) {
 
   // Функция для подключения к чату (вызывается при отправке формы входа)
   const connectToChat = async () => {
-      // Проверяем, что имя пользователя не пустое
-      if (!username.trim()) {
-        alert('Пожалуйста, введите имя пользователя');
-        return;
-      }
+    // Проверяем, что имя пользователя не пустое
+    if (!username.trim()) {
+      alert('Пожалуйста, введите имя пользователя');
+      return;
+    }
 
-      const client = await userByCookie()
-      console.log('User:', username);
-      const websocket = new WebSocket(`ws://localhost:8000/clients/${client}`);
+    const client = await userByCookie();
+    if (!client) {
+      alert('Не удалось получить данные пользователя');
+      return;
+    }
 
-      // Обработчик события: соединение установлено
-      websocket.onopen = () => {
-        console.log('WebSocket подключен');
-        setIsConnected(true);  // Устанавливаем флаг подключения
-        setHasJoined(true);    // Показываем интерфейс чата
-      };
+    console.log('User:', client);
+    const websocket = new WebSocket(`ws://localhost:8000/clients/${client}`);
 
-      // Обработчик события: получено сообщение от сервера
-      websocket.onmessage = (event) => {
-        // console.log(event.data)
-        try {
-          // Клиент получает JSON от оператора
-          const data = JSON.parse(event.data);
-          let displayText = '';
+    // Обработчик события: соединение установлено
+    websocket.onopen = () => {
+      console.log('✓ WebSocket подключен');
+      setIsConnected(true);
+      setHasJoined(true);
+      setIsLoggedIn(true)
+    };
 
-          if (data.type === "operator_message" || data.type === "notify") {
-            // Функция для извлечения текста из возможного JSON
-            const extractText = (input: any): string => {
-              if (typeof input === 'string') {
-                try {
-                  const parsed = JSON.parse(input);
-                  // Рекурсивно извлекаем из поля message
-                  return extractText(parsed.message || input);
-                } catch {
-                  return input; // Не JSON, возвращаем как есть
-                }
-              } else if (input && typeof input === 'object') {
-                return extractText(input.message || JSON.stringify(input));
-              }
-              return String(input);
-            };
+    // Обработчик события: получено сообщение от сервера
+    websocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('Получено сообщение:', data);
 
-            displayText = extractText(data.message);
-
-            const newMessage = {
-              id: Date.now().toString() + Math.random(),
-              message: displayText, // ✅ Только текст
-              username: 'Оператор',
-              timestamp: new Date(),
-              isOwn: false
-            };
-
-            setMessages(prev => [...prev, newMessage]);
-          } else if (data.type === "greeting") {
-            // Приветственное сообщение от системы
-            const newMessage: Message = {
-              id: Date.now().toString() + Math.random(),
-              message: data.message,
-              username: 'Система',  // Отправитель - система
-              timestamp: new Date(),
-              isOwn: false  // Это системное сообщение
-            };
-            setMessages(prev => [...prev, newMessage]);
-
-          } else if (data.type === "advertising") {
-            const newMessage: Message = {
-              id: Date.now().toString() + Math.random(),
-              message: data.message,
-              username: 'Система',  // Отправитель - система
-              timestamp: new Date(),
-              isOwn: false  // Это системное сообщение
-            };
-            setMessages(prev => [...prev, newMessage])
-          }
-
-        } catch (error) {
+        // ✅ Обрабатываем разные типы сообщений
+        if (data.type === "operator_message") {
+          // Сообщение от оператора
           const newMessage: Message = {
             id: Date.now().toString() + Math.random(),
-            message: event.data.message,  // Используем как есть
-            username: event.data.includes("Subscribe") ? 'Система' : 'Оператор',
+            message: data.message,
+            username: data.from || 'Оператор',
             timestamp: new Date(),
             isOwn: false
           };
+          operator.current = data.from
+          setMessages(prev => [...prev, newMessage]);
 
+        } else if (data.type === "greeting") {
+          // Приветственное сообщение от системы
+          const newMessage: Message = {
+            id: Date.now().toString() + Math.random(),
+            message: data.message,
+            username: 'Система',
+            timestamp: new Date(),
+            isOwn: false
+          };
+          setMessages(prev => [...prev, newMessage]);
+
+        } else if (data.type === "advertising" || data.type === "notify") {
+          // Рекламное или уведомляющее сообщение
+          const newMessage: Message = {
+            id: Date.now().toString() + Math.random(),
+            message: data.message,
+            username: 'Система',
+            timestamp: new Date(),
+            isOwn: false
+          };
+          setMessages(prev => [...prev, newMessage]);
+
+        } else {
+          // Неизвестный тип - пытаемся отобразить как есть
+          const newMessage: Message = {
+            id: Date.now().toString() + Math.random(),
+            message: data.message || JSON.stringify(data),
+            username: data.from || 'Система',
+            timestamp: new Date(),
+            isOwn: false
+          };
           setMessages(prev => [...prev, newMessage]);
         }
-      };
-
-      // Обработчик события: произошла ошибка WebSocket
-      websocket.onerror = (error) => {
-        console.error('WebSocket ошибка:', error);
-        setIsConnected(false);
-      };
-
-      // Обработчик события: соединение закрыто
-      websocket.onclose = () => {
-        console.log('WebSocket отключен');
-        setIsConnected(false);
-      };
-
-      // Сохраняем объект WebSocket в состоянии
-      setWs(websocket);
-    }
-  ;
-
-  // Функция для отправки сообщения оператору
-  const sendMessage = (e: React.FormEvent) => {
-    e.preventDefault();  // Предотвращаем перезагрузку страницы
-
-    // Проверяем все условия перед отправкой
-    if (!inputValue.trim() || !ws || !isConnected) return;
-
-    // Клиент отправляет простой текст (не JSON)
-    // Бэкенд получит это в методе websocket.receive_text()
-    ws.send(inputValue);
-
-    // Добавляем наше собственное сообщение в список (для отображения справа)
-    const ownMessage: Message = {
-      id: Date.now().toString() + Math.random(),  // Генерируем уникальный ID
-      message: inputValue,                           // Текст который мы ввели
-      username: username,                         // Наше имя
-      timestamp: new Date(),                      // Текущее время
-      isOwn: true                                 // Это наше сообщение
+      } catch (error) {
+        console.error('Ошибка парсинга сообщения:', error);
+        // Если не JSON, показываем как текст
+        const newMessage: Message = {
+          id: Date.now().toString() + Math.random(),
+          message: event.data,
+          username: 'Система',
+          timestamp: new Date(),
+          isOwn: false
+        };
+        setMessages(prev => [...prev, newMessage]);
+      }
     };
 
-    // Добавляем сообщение в массив
-    setMessages(prev => [...prev, ownMessage]);
+    // Обработчик события: произошла ошибка WebSocket
+    websocket.onerror = (error) => {
+      console.error('WebSocket ошибка:', error);
+      setIsConnected(false);
+    };
 
-    // Очищаем поле ввода
+    // Обработчик события: соединение закрыто
+    websocket.onclose = () => {
+      console.log('WebSocket отключен');
+      setIsConnected(false);
+    };
+
+    // Сохраняем объект WebSocket в состоянии
+    setWs(websocket);
+  };
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    connectToChat();
+    setHasJoined(true)
+  };
+
+  const sendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!inputValue.trim() || !ws || !isConnected) return;
+
+    // ✅ ОТПРАВЛЯЕМ JSON вместо простого текста
+    const messageData = {
+      message: inputValue,
+      from: username,  // Тип сообщения
+      to: operator.current
+    };
+    ws.send(JSON.stringify(messageData));
+
+    const newMessage: Message = {
+      id: Date.now().toString() + Math.random(),
+      message: inputValue,
+      username: username,
+      timestamp: new Date(),
+      isOwn: true
+    };
+
+    setMessages(prev => [...prev, newMessage]);
     setInputValue('');
   };
 
-  // Если окно закрыто, не рендерим ничего
   if (!isOpen) return null;
 
-  return (
-    // Оверлей на весь экран с затемнением
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      {/* Основной контейнер окна чата */}
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl h-[600px] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+  if (!isLoggedIn) {
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-800">Вход клиента</h2>
+            <button
+              onClick={onClose}
+              className="hover:bg-gray-100 p-2 rounded-lg transition-colors"
+            >
+              <X className="w-6 h-6 text-gray-600" />
+            </button>
+          </div>
 
-        {/* Шапка чата */}
-        <div
-          className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Иконка чата */}
-            <div className="bg-white/20 p-2 rounded-lg">
-              💬
-            </div>
+          <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <h2 className="font-semibold text-lg">Чат</h2>
-              {/* Индикатор подключения */}
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                Ваше имя
+              </label>
+              <input
+                type="text"
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Введите ваше имя"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                autoFocus
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={!username.trim()}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+            >
+              Подключиться к чату
+            </button>
+          </form>
+
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+            <p className="text-xs text-blue-800">
+              💡 Будет использован ваш session_id из localStorage
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl h-[600px] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-lg">Чат поддержки</h3>
               <div className="flex items-center gap-2 text-sm">
                 {isConnected ? (
                   <>
-                    <Wifi className="w-4 h-4"/>
-                    <span>Подключено</span>
+                    <Wifi className="w-4 h-4" />
+                    <span>Подключен ({username})</span>
                   </>
                 ) : (
                   <>
-                    <WifiOff className="w-4 h-4"/>
-                    <span>Не подключено</span>
+                    <WifiOff className="w-4 h-4" />
+                    <span>Отключен</span>
                   </>
                 )}
               </div>
             </div>
+            <button
+              onClick={onClose}
+              className="hover:bg-white/20 p-2 rounded-lg transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
           </div>
-          {/* Кнопка закрытия окна */}
-          <button
-            onClick={onClose}
-            className="hover:bg-white/20 p-2 rounded-lg transition-colors"
-          >
-            <X className="w-6 h-6"/>
-          </button>
         </div>
 
-        {/* Условный рендеринг: форма входа ИЛИ интерфейс чата */}
-        {!hasJoined ? (
-          // ФОРМА ВХОДА (показывается до подключения)
-          <div className="flex-1 flex items-center justify-center p-8">
-            <div className="w-full max-w-sm">
-              {/* Приветственный текст */}
-              <div className="text-center mb-6">
-                <div className="inline-block bg-blue-100 p-4 rounded-full mb-4">
-                  <User className="w-8 h-8 text-blue-600"/>
-                </div>
-                <h3 className="text-2xl font-semibold text-gray-800 mb-2">
-                  Добро пожаловать!
-                </h3>
-                <p className="text-gray-600">
-                  Введите ваше имя для входа в чат
-                </p>
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+          {messages.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-gray-400">
+              <div className="text-center">
+                <div className="text-4xl mb-2">💬</div>
+                <p>Начните диалог с оператором</p>
               </div>
-
-              {/* Форма ввода имени пользователя */}
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                connectToChat();  // При отправке подключаемся к чату
-              }}>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Ваше имя"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-3 rounded-lg font-semibold transition-all"
-                >
-                  Войти в чат
-                </button>
-              </form>
             </div>
-          </div>
-        ) : (
-          // ИНТЕРФЕЙС ЧАТА (показывается после входа)
-          <>
-            {/* Область сообщений */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-                {messages.length === 0 ? (
-                  // Пустое состояние (нет сообщений)
-                  <div className="h-full flex items-center justify-center text-gray-400">
-                    <div className="text-center">
-                      <div className="text-4xl mb-2">💬</div>
-                      <p>Сообщений пока нет</p>
-                      <p className="text-sm">Начните разговор!</p>
-                    </div>
+          ) : (
+            messages.map((message, index) => (
+              <div
+                key={index}
+                className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                    message.isOwn
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-br-sm'
+                      : 'bg-white text-gray-800 rounded-bl-sm shadow-sm'
+                  }`}
+                >
+                  <div className="break-words">{message.message}</div>
+                  <div className={`text-xs mt-1 ${message.isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
+                    {message.timestamp.toLocaleTimeString('ru-RU', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
                   </div>
-                ) : (
-                  // Список сообщений
-                  messages.map((message) => (
-
-                    <div
-                      key={message.id}
-                      // Свои сообщения справа, чужие слева
-                      className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        // Разные стили для своих и чужих сообщений
-                        className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                          message.isOwn
-                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-br-sm'  // Свои: синий фон
-                            : 'bg-white text-gray-800 rounded-bl-sm shadow-sm'  // Чужие: белый фон
-                        }`}
-                      >
-                        {/* Имя отправителя (только для чужих сообщений) */}
-                        {!message.isOwn && (
-                          <div className="text-xs font-semibold mb-1 opacity-70">
-                            {message.username}
-                          </div>
-                        )}
-                        {/* Текст сообщения */}
-                        <div className="break-words">{message.message}</div>
-                        {/* Время отправки */}
-                        <div className={`text-xs mt-1 ${message.isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
-                          {message.timestamp.toLocaleTimeString('ru-RU', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-                {/* Невидимый div для автоматической прокрутки */}
-                <div ref={messagesEndRef}/>
-              </div>
-
-              {/* Поле ввода сообщения */}
-              <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200">
-                <div className="flex gap-2">
-                  {/* Текстовое поле */}
-                  <input
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    placeholder="Напишите сообщение..."
-                    disabled={!isConnected}  // Отключаем если нет соединения
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900"
-                  />
-                  {/* Кнопка отправки */}
-                  <button
-                    type="submit"
-                    disabled={!isConnected || !inputValue.trim()}  // Отключаем если нет соединения или пустое поле
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    <Send className="w-5 h-5"/>
-                  </button>
                 </div>
-              </form>
-          </>
-        )}
+              </div>
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input */}
+        <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Напишите сообщение..."
+              disabled={!isConnected}
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900"
+            />
+            <button
+              type="submit"
+              disabled={!isConnected || !inputValue.trim()}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

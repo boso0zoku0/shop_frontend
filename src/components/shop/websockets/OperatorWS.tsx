@@ -1,13 +1,13 @@
-import {useState, useEffect, useRef} from 'react';
-import {Send, X, Wifi, WifiOff, Users} from 'lucide-react';
-import NotificationToast from "./NotificationToast.tsx";
+import { useState, useEffect, useRef } from 'react';
+import { Users, Wifi, WifiOff, Send, X } from 'lucide-react';
+import axios from 'axios';
 
 // Интерфейс для описания структуры сообщения оператора
 interface Message {
   client: string;      // ID клиента, с которым связано сообщение
-  message: string;        // Текст сообщения
-  timestamp: Date;        // Время отправки
-  fromOperator: boolean;  // Флаг: отправлено ли сообщение оператором (true) или получено от клиента (false)
+  message: string;     // Текст сообщения
+  timestamp: Date;     // Время отправки
+  fromOperator: boolean;  // Флаг: отправлено ли сообщение оператором
 }
 
 // Тип для хранения сообщений: ключ - ID клиента, значение - массив сообщений
@@ -22,40 +22,51 @@ interface OperatorPanelProps {
 }
 
 // Компонент панели оператора (для общения с несколькими клиентами)
-export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
-  // Состояние: объект, где для каждого клиента хранится массив сообщений
-  // Структура: { "bob": [сообщения с bob], "alice": [сообщения с alice] }
+export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
   const [messages, setMessages] = useState<ClientMessages>({});
-
-  // Состояние: текущее значение в поле ввода
   const [inputValue, setInputValue] = useState('');
-
-  // Состояние: подключен ли WebSocket
   const [isConnected, setIsConnected] = useState(false);
-
-  // Состояние: ID клиента, с которым сейчас ведется переписка (выбран в списке)
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
-
-  // Состояние: объект WebSocket соединения
   const [ws, setWs] = useState<WebSocket | null>(null);
-
-  // Состояние: имя оператора (вводится при входе)
   const [operatorName, setOperatorName] = useState('');
-
-  // Состояние: вошел ли оператор (прошел форму входа)
   const [hasJoined, setHasJoined] = useState(false);
 
-  const [notifyConnect, setNotifyConnect] = useState(null)
+  // ✅ ИСПРАВЛЕНО: Правильная типизация для списка клиентов
+  const [availableClients, setAvailableClients] = useState<string[]>([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
 
-  // Реф для автоматической прокрутки к последнему сообщению
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // ✅ ИСПРАВЛЕНО: Функция загрузки списка клиентов
+  const loadClients = async () => {
+    setIsLoadingClients(true);
+    try {
+      const response = await axios.get("http://localhost:8000/get-clients");
+      console.log('Получены клиенты:', response.data);
+      setAvailableClients(response.data);
+    } catch (error) {
+      console.error("Ошибка получения клиентов:", error);
+      setAvailableClients([]);
+    } finally {
+      setIsLoadingClients(false);
+    }
+  };
+
+  // ✅ ИСПРАВЛЕНО: Загружаем клиентов при открытии панели
+  useEffect(() => {
+    if (isOpen && hasJoined) {
+      loadClients();
+      // Обновляем список каждые 5 секунд
+      const interval = setInterval(loadClients, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [isOpen, hasJoined]);
 
   // Функция для прокрутки к последнему сообщению
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Эффект: автоматически прокручиваем вниз при изменении сообщений или выбранного клиента
   useEffect(() => {
     scrollToBottom();
   }, [messages, selectedClient]);
@@ -63,7 +74,6 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
   // Эффект: управление подключением при открытии/закрытии панели
   useEffect(() => {
     if (!isOpen) {
-      // Если панель закрывается и есть соединение - отключаемся и очищаем состояния
       if (ws) {
         ws.close();
         setWs(null);
@@ -74,164 +84,128 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
       setSelectedClient(null);
       setOperatorName('');
       setInputValue('');
+      setAvailableClients([]);
     }
   }, [isOpen]);
 
-  if (!selectedClient) {
-    console.log("Choose client")
-
-  }
-
-  const connectShowClients = () => {
-
-    const websocket = new WebSocket("ws://localhost:8000/operator/get-clients")
-    websocket.onopen = () => {
-      return websocket.send()
-    }
-  }
-  // Функция для подключения оператора к WebSocket (вызывается при отправке формы входа)
+  // ✅ ИСПРАВЛЕНО: Подключаемся БЕЗ указания клиента в URL
   const connectAsOperator = () => {
-    // Проверяем, что имя оператора не пустое
     if (!operatorName.trim()) {
       alert('Пожалуйста, введите ваше имя');
       return;
     }
 
-    // Подключаемся к эндпоинту оператора
-    const websocket = new WebSocket(`ws://localhost:8000/operator/${operatorName}/anna`);
+    // Подключаемся к эндпоинту оператора БЕЗ клиента в URL
+    const websocket = new WebSocket(`ws://localhost:8000/operator/${operatorName}`);
 
-    // Обработчик события: соединение установлено
     websocket.onopen = () => {
-      console.log('Оператор подключен');
+      console.log('✓ Оператор подключен');
       setIsConnected(true);
-      setHasJoined(true);  // Показываем интерфейс панели оператора
+      setHasJoined(true);
+      setWs(websocket);
     };
 
-    // Обработчик события: получено сообщение от сервера
     websocket.onmessage = (event) => {
       try {
-        // Оператор получает JSON с информацией о клиенте и его сообщении
         const data = JSON.parse(event.data);
-        if (data.type === 'client_message') {
-          setNotifyConnect({
-            type: 'client_connected',
-            client: data.client,
-          })
-          const newMessage: Message = {
-            client: data.client,  // От кого пришло
-            message: data.message,       // Текст
-            timestamp: new Date(),       // Текущее время
-            fromOperator: false          // Это сообщение ОТ клиента (не от оператора)
-          }
+        console.log('Получено сообщение:', data);
 
-        // Добавляем сообщение в историю конкретного клиента
-          setMessages(prev => ({
-            ...prev,  // Сохраняем все предыдущие чаты
-            [data.client]: [...(prev[data.client] || []), newMessage]  // Добавляем новое сообщение к истории клиента
-          }))}
-        // Проверяем что есть client и message (это сообщение от клиента)
-        if (data.client && data.message) {
-          // Создаем объект сообщения
+        // Если это сообщение от клиента
+        if (data.type === "client_message" && data.from && data.message) {
           const newMessage: Message = {
-            client: data.client,  // От кого пришло
-            message: data.message,       // Текст
-            timestamp: new Date(),       // Текущее время
-            fromOperator: false          // Это сообщение ОТ клиента (не от оператора)
+            client: data.from,
+            message: data.message,
+            timestamp: new Date(),
+            fromOperator: false
           };
 
-
-          // Добавляем сообщение в историю конкретного клиента
           setMessages(prev => ({
-            ...prev,  // Сохраняем все предыдущие чаты
-            [data.client]: [...(prev[data.client] || []), newMessage]  // Добавляем новое сообщение к истории клиента
+            ...prev,
+            [data.from]: [...(prev[data.from] || []), newMessage]
           }));
 
-          // Если не выбран никакой клиент, автоматически выбираем того, кто написал
+          // Автоматически выбираем клиента если не выбран
           if (!selectedClient) {
-            setSelectedClient(data.client);
+            setSelectedClient(data.from);
           }
+
+          // Обновляем список клиентов
+          loadClients();
         }
       } catch (error) {
         console.error('Ошибка обработки сообщения:', error);
       }
     };
 
-    // Обработчик события: произошла ошибка WebSocket
     websocket.onerror = (error) => {
       console.error('WebSocket ошибка:', error);
       setIsConnected(false);
     };
 
-    // Обработчик события: соединение закрыто
     websocket.onclose = () => {
       console.log('WebSocket оператора отключен');
       setIsConnected(false);
     };
-
-    // Сохраняем объект WebSocket в состоянии
-    setWs(websocket);
   };
 
-  // Функция для отправки сообщения клиенту
+  // ✅ ИСПРАВЛЕНО: Отправка сообщения с указанием получателя
   const sendMessage = (e: React.FormEvent) => {
-    e.preventDefault();  // Предотвращаем перезагрузку страницы
+    e.preventDefault();
 
-    // Проверяем все условия перед отправкой
-    if (!inputValue.trim() || !ws || !isConnected || !selectedClient) return;
+    if (!inputValue.trim() || !ws || !isConnected || !selectedClient) {
+      console.warn('Не все условия выполнены для отправки');
+      return;
+    }
 
-    // Формируем JSON для отправки оператором
-    // Бэкенд ожидает: { client: string, message: string }
+    // Формируем JSON с указанием получателя (to)
     const messageData = {
-      client: selectedClient,  // Кому отправляем
-      message: inputValue,                // Текст сообщения
+      from: operatorName,
+      to: selectedClient,           // ← ВАЖНО: "to" вместо "client"
+      message: inputValue,
       type: "operator_message"
-
     };
 
-    // Отправляем JSON на сервер
+    console.log('Отправка сообщения:', messageData);
     ws.send(JSON.stringify(messageData));
-    // Добавляем сообщение в локальную историю (для отображения справа)
+
+    // Добавляем в локальную историю
     const newMessage: Message = {
-      client: selectedClient,  // С каким клиентом связано
-      message: inputValue,        // Текст
-      timestamp: new Date(),      // Время отправки
-      fromOperator: true          // Это сообщение ОТ оператора
+      client: selectedClient,
+      message: inputValue,
+      timestamp: new Date(),
+      fromOperator: true
     };
 
-    // Добавляем сообщение в историю выбранного клиента
     setMessages(prev => ({
       ...prev,
       [selectedClient]: [...(prev[selectedClient] || []), newMessage]
     }));
 
-    // Очищаем поле ввода
     setInputValue('');
   };
 
-  // Получаем список всех client (ключи объекта messages)
-  const clientList = Object.keys(messages);
+  // Получаем список клиентов из messages (с кем уже была переписка)
+  const clientsWithMessages = Object.keys(messages);
+
+  // Объединяем списки: клиенты из API + клиенты с которыми уже общались
+  const allClients = Array.from(new Set([...availableClients, ...clientsWithMessages]));
 
   // Получаем массив сообщений с текущим выбранным клиентом
   const currentMessages = selectedClient ? messages[selectedClient] || [] : [];
 
-  // Если панель закрыта, не рендерим ничего
   if (!isOpen) return null;
 
   return (
-    // Оверлей на весь экран с затемнением
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      {/* Основной контейнер панели оператора (широкий, с боковой панелью) */}
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[700px] flex overflow-hidden">
 
-        {/* Условный рендеринг: форма входа ИЛИ интерфейс панели оператора */}
         {!hasJoined ? (
-          // ФОРМА ВХОДА (показывается до подключения)
+          // ФОРМА ВХОДА
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="w-full max-w-sm">
-              {/* Приветственный текст */}
               <div className="text-center mb-6">
                 <div className="inline-block bg-purple-100 p-4 rounded-full mb-4">
-                  <Users className="w-8 h-8 text-purple-600"/>
+                  <Users className="w-8 h-8 text-purple-600" />
                 </div>
                 <h3 className="text-2xl font-semibold text-gray-800 mb-2">
                   Панель оператора
@@ -241,10 +215,9 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
                 </p>
               </div>
 
-              {/* Форма ввода имени оператора */}
               <form onSubmit={(e) => {
                 e.preventDefault();
-                connectAsOperator();  // При отправке подключаемся
+                connectAsOperator();
               }}>
                 <input
                   type="text"
@@ -264,33 +237,24 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
             </div>
           </div>
         ) : (
-          // ИНТЕРФЕЙС ПАНЕЛИ ОПЕРАТОРА (показывается после входа)
+          // ИНТЕРФЕЙС ПАНЕЛИ ОПЕРАТОРА
           <>
-            {notifyConnect && (
-              <NotificationToast
-                notification={notifyConnect}
-                onClose={() => setNotifyConnect(null)} // ← Вот что передать в onClose
-              />
-            )}
             {/* БОКОВАЯ ПАНЕЛЬ - список клиентов */}
             <div className="w-72 bg-gray-50 border-r border-gray-200 flex flex-col">
-              {/* Шапка боковой панели */}
-
               <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <Users className="w-5 h-5"/>
+                  <Users className="w-5 h-5" />
                   <h3 className="font-semibold">Панель оператора</h3>
                 </div>
-                {/* Индикатор подключения */}
                 <div className="flex items-center gap-2 text-sm">
                   {isConnected ? (
                     <>
-                      <Wifi className="w-4 h-4"/>
-                      <span>Онлайн</span>
+                      <Wifi className="w-4 h-4" />
+                      <span>Онлайн ({operatorName})</span>
                     </>
                   ) : (
                     <>
-                      <WifiOff className="w-4 h-4"/>
+                      <WifiOff className="w-4 h-4" />
                       <span>Оффлайн</span>
                     </>
                   )}
@@ -299,52 +263,45 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
 
               {/* Список клиентов */}
               <div className="flex-1 overflow-y-auto p-2">
-                {clientList.length === 0 ? (
-                  // Пустое состояние (нет клиентов)
+                {isLoadingClients && allClients.length === 0 ? (
+                  <div className="text-center text-gray-400 mt-4">
+                    <p className="text-sm">Загрузка клиентов...</p>
+                  </div>
+                ) : allClients.length === 0 ? (
                   <div className="text-center text-gray-400 mt-8 px-4">
-                    <Users className="w-12 h-12 mx-auto mb-2 opacity-50"/>
+                    <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">Нет активных клиентов</p>
                   </div>
                 ) : (
-                  // Список карточек клиентов
                   <div className="space-y-1">
-                    {clientList.map((client) => {
-                      // Получаем все сообщения для этого клиента
+                    {allClients.map((client) => {
                       const clientMessages = messages[client] || [];
-
-                      // Получаем последнее сообщение для превью
                       const lastMessage = clientMessages[clientMessages.length - 1];
-
-                      // Считаем количество непрочитанных (все сообщения ОТ клиента)
                       const unreadCount = clientMessages.filter(m => !m.fromOperator).length;
 
                       return (
                         <button
                           key={client}
-                          onClick={() => setSelectedClient(client)}  // При клике выбираем этого клиента
-                          // Разные стили для выбранного и невыбранного клиента
+                          onClick={() => setSelectedClient(client)}
                           className={`w-full text-left p-3 rounded-lg transition-colors ${
                             selectedClient === client
-                              ? 'bg-purple-100 border-2 border-purple-500'  // Выбранный
-                              : 'bg-white hover:bg-gray-100 border-2 border-transparent'  // Невыбранный
+                              ? 'bg-purple-100 border-2 border-purple-500'
+                              : 'bg-white hover:bg-gray-100 border-2 border-transparent'
                           }`}
                         >
-                          {/* Верхняя строка: имя клиента и бейдж с количеством сообщений */}
                           <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-gray-800 truncate">
-                          {client}
-                        </span>
-                            {/* Показываем бейдж только если есть непрочитанные */}
+                            <span className="font-semibold text-gray-800 truncate">
+                              {client}
+                            </span>
                             {unreadCount > 0 && (
                               <span className="bg-purple-600 text-white text-xs px-2 py-0.5 rounded-full">
-                            {unreadCount}
-                          </span>
+                                {unreadCount}
+                              </span>
                             )}
                           </div>
-                          {/* Превью последнего сообщения */}
                           {lastMessage && (
                             <p className="text-xs text-gray-500 truncate">
-                              {lastMessage.fromOperator ? 'Вы: ' : ''} {/* Если от оператора, добавляем "Вы:" */}
+                              {lastMessage.fromOperator ? 'Вы: ' : ''}
                               {lastMessage.message}
                             </p>
                           )}
@@ -358,107 +315,98 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
 
             {/* ОСНОВНАЯ ОБЛАСТЬ ЧАТА */}
             <div className="flex-1 flex flex-col">
-              {notifyConnect ? <div>Connect</div> : ''}
-              {/* Header основной области */}
-              <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between">
+              {/* Шапка чата */}
+              <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 flex items-center justify-between">
                 <div>
                   {selectedClient ? (
-                    // Если выбран клиент, показываем его имя
                     <>
-                      <h2 className="font-semibold text-lg text-gray-800">
-                        Чат с {selectedClient}
-                      </h2>
-                      <p className="text-sm text-gray-500">Активен</p>
+                      <h3 className="font-semibold">Чат с {selectedClient}</h3>
+                      <p className="text-sm opacity-90">
+                        {currentMessages.length} сообщений
+                      </p>
                     </>
                   ) : (
-                    // Если не выбран клиент
-                    <h2 className="font-semibold text-lg text-gray-400">
-                      Выберите клиента
-                    </h2>
+                    <h3 className="font-semibold">Выберите клиента</h3>
                   )}
                 </div>
-                {/* Кнопка закрытия панели */}
                 <button
                   onClick={onClose}
-                  className="hover:bg-gray-100 p-2 rounded-lg transition-colors"
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
                 >
-                  <X className="w-6 h-6 text-gray-600"/>
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Область сообщений */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
                 {!selectedClient ? (
-                  // Не выбран клиент
                   <div className="h-full flex items-center justify-center text-gray-400">
                     <div className="text-center">
-                      <div className="text-4xl mb-2">👈</div>
-                      <p>Выберите клиента из списка</p>
+                      <Users className="w-16 h-16 mx-auto mb-3 opacity-50" />
+                      <p>Выберите клиента из списка слева</p>
                     </div>
                   </div>
                 ) : currentMessages.length === 0 ? (
-                  // Выбран клиент, но нет сообщений с ним
                   <div className="h-full flex items-center justify-center text-gray-400">
                     <div className="text-center">
-                      <div className="text-4xl mb-2">💬</div>
                       <p>Нет сообщений</p>
+                      <p className="text-sm mt-1">Начните переписку</p>
                     </div>
                   </div>
                 ) : (
-                  // Есть сообщения - отображаем их
-                  currentMessages.map((message, index) => (
+                  currentMessages.map((msg, idx) => (
                     <div
-                      key={index}
-                      // Сообщения оператора справа, клиента слева
-                      className={`flex ${message.fromOperator ? 'justify-end' : 'justify-start'}`}
+                      key={idx}
+                      className={`flex ${msg.fromOperator ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        // Разные стили для сообщений оператора и клиента
-                        className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                          message.fromOperator
-                            ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-br-sm'  // Оператор: фиолетовый
-                            : 'bg-white text-gray-800 rounded-bl-sm shadow-sm'  // Клиент: белый
+                        className={`max-w-[70%] px-4 py-2 rounded-2xl ${
+                          msg.fromOperator
+                            ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                            : 'bg-white text-gray-800 border border-gray-200'
                         }`}
                       >
-                        {/* Текст сообщения */}
-                        <div className="break-words">{message.message}</div>
-                        {/* Время отправки */}
-                        <div className={`text-xs mt-1 ${message.fromOperator ? 'text-purple-100' : 'text-gray-400'}`}>
-                          {message.timestamp.toLocaleTimeString('ru-RU', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </div>
+                        <p>{msg.message}</p>
+                        <p
+                          className={`text-xs mt-1 ${
+                            msg.fromOperator ? 'text-purple-100' : 'text-gray-400'
+                          }`}
+                        >
+                          {msg.timestamp.toLocaleTimeString()}
+                        </p>
                       </div>
                     </div>
                   ))
                 )}
-                {/* Невидимый div для автоматической прокрутки */}
-                <div ref={messagesEndRef}/>
+                <div ref={messagesEndRef} />
               </div>
 
-              {/* Поле ввода сообщения */}
-              <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200">
-                <div className="flex gap-2">
-                  {/* Текстовое поле */}
-                  <input
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    placeholder={selectedClient ? "Напишите сообщение..." : "Выберите клиента"}
-                    disabled={!isConnected || !selectedClient}  // Отключаем если нет соединения или не выбран клиент
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900"
-                  />
-                  {/* Кнопка отправки */}
-                  <button
-                    type="submit"
-                    disabled={!isConnected || !selectedClient || !inputValue.trim()}  // Отключаем при недоступности
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    <Send className="w-5 h-5"/>
-                  </button>
-                </div>
-              </form>
+              {/* Форма отправки */}
+              <div className="bg-white border-t border-gray-200 p-4">
+                {!selectedClient ? (
+                  <div className="text-center text-gray-400 py-2">
+                    Выберите клиента для отправки сообщения
+                  </div>
+                ) : (
+                  <form onSubmit={sendMessage} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      placeholder={`Сообщение для ${selectedClient}...`}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+                      disabled={!isConnected}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!isConnected || !inputValue.trim()}
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-lg transition-all"
+                    >
+                      <Send className="w-5 h-5" />
+                    </button>
+                  </form>
+                )}
+              </div>
             </div>
           </>
         )}

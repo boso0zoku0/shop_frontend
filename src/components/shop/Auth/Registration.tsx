@@ -2,6 +2,7 @@ import React, {useState} from 'react';
 import {Lock, User} from 'lucide-react';
 import {Link, useNavigate} from "react-router-dom";
 import axios from "axios";
+import {setSessionCookie} from "../cookieHelper.tsx";
 
 export default function RegistrationUsers( ) {
   const [username, setUsername] = useState('');
@@ -24,6 +25,7 @@ export default function RegistrationUsers( ) {
     )
     localStorage.setItem("cookie_session_id", resp.data.cookie_session_id)
     if (resp.status <= 201) {
+      setSessionCookie(resp.data.cookie_session_id);
       setPassword('')
       setUsername('')
       navigate('/games')
