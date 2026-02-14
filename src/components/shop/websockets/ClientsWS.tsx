@@ -1,8 +1,6 @@
-import {useState, useEffect, useRef} from 'react';
-import {Send, X, Wifi, WifiOff, User} from 'lucide-react';
-import axios from 'axios';
-import {getSessionId, setSessionCookie} from '../cookieHelper';
-import {ChatBubbleBottomCenterTextIcon} from '@heroicons/react/24/solid'
+import React, {useState, useEffect, useRef} from 'react';
+import {X, Send, Wifi, WifiOff, UserCircle2, Bot, Shield, User, Clock} from 'lucide-react';
+import {getSessionId, setSessionCookie} from "../cookieHelper.tsx";
 
 interface Message {
   id: string;
@@ -10,13 +8,160 @@ interface Message {
   username: string;
   timestamp: Date;
   isOwn: boolean;
-  isButton: boolean
+  isButton?: boolean;
+  type?: string; // 'system', 'bot', 'operator', 'client'
 }
 
 interface ClientPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  ws: WebSocket
+
 }
+
+
+// Компонент для отображения одного сообщения
+const MessageBubble = ({message, onBotMessageClick, username, ws}: {
+  message: Message;
+  onBotMessageClick?: (text: string) => void;
+}) => {
+  // Определяем тип отправителя
+  const getSenderType = () => {
+    if (message.isOwn) return 'client_message';
+    if (message.username === 'Система' || message.type === 'greeting' || message.type === 'advertising') return 'system_message';
+    if (message.username === 'Bot' || message.type === 'bot_message') return 'bot_message';
+    return 'operator_message'; // По умолчанию - оператор
+  };
+
+  const senderType = getSenderType();
+
+  // Стили для разных типов отправителей
+  const styles = {
+    client_message: {
+      container: 'justify-end',
+      bubble: 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-br-sm',
+      icon: null,
+      iconBg: '',
+      textColor: 'text-white',
+      timeColor: 'text-blue-100'
+    },
+    operator_message: {
+      container: 'justify-start',
+      bubble: 'bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-bl-sm shadow-md',
+      icon: <UserCircle2 className="w-5 h-5"/>,
+      iconBg: 'bg-purple-100',
+      textColor: 'text-white',
+      timeColor: 'text-purple-100'
+    },
+    bot_message: {
+      container: 'justify-start',
+      bubble: 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-bl-sm shadow-md cursor-pointer hover:from-emerald-600 hover:to-teal-600 transition-all',
+      icon: <Bot className="w-5 h-5 text-emerald-700"/>,
+      iconBg: 'bg-emerald-100',
+      textColor: 'text-white',
+      timeColor: 'text-emerald-100'
+    },
+    system_message: {
+      container: 'justify-center',
+      bubble: 'bg-gray-100 text-gray-700 rounded-lg shadow-sm border border-gray-200',
+      icon: <Shield className="w-4 h-4 text-gray-500"/>,
+      iconBg: 'bg-gray-50',
+      textColor: 'text-gray-700',
+      timeColor: 'text-gray-500'
+    }
+  };
+
+  const style = styles[senderType];
+
+  const handleBotClick = () => {
+    if (senderType === 'bot_message' && onBotMessageClick) {
+      onBotMessageClick(message.message);
+    }
+  };
+
+  if (senderType === 'system_message') {
+    // Системные сообщения в центре
+    return (
+      <div className="flex justify-center my-2">
+        <div className="bg-gray-100 px-4 py-2 rounded-full shadow-sm border border-gray-200 max-w-[80%]">
+          <div className="flex items-center gap-2">
+            <Shield className="w-6 h-6 text-gray-500"/>
+            <div className="break-words">{message.message}</div>
+            <div className="text-xs mt-1.5 text-purple-100 opacity-75 flex items-center gap-1">
+              <Clock className="w-3 h-3"/>
+              {message.timestamp.toLocaleTimeString('ru-RU', {
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex ${style.container} mb-3`}>
+      <div className="flex items-end gap-2 max-w-[70%]">
+        {/* Иконка слева для входящих сообщений */}
+        {!message.isOwn && style.icon && (
+          <div className={`${style.iconBg} p-2 rounded-full mb-1 flex-shrink-0`}>
+            {style.icon}
+          </div>
+        )}
+
+        {/* Сообщение */}
+        <div>
+          {/* Имя отправителя (для входящих) */}
+          {!message.isOwn && (
+            <div className="text-xs text-gray-500 mb-1 ml-1">
+              {message.username}
+            </div>
+          )}
+
+          {/* Пузырь сообщения */}
+          <div
+            className={`px-4 py-3 rounded-2xl ${style.bubble}`}
+            onClick={handleBotClick}
+          >
+            {message.isButton ? (
+              <button
+                className="text-left hover:no-underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Отправляем текст кнопки на бэк
+                  const messageData = {
+                    message: message.message,
+                    from: username, // или ваш текущий пользователь
+                  };
+                  ws.send(JSON.stringify(messageData));
+                }}
+              > {message.message}
+              </button>
+            ) : (
+              <div className="break-words">{message.message}</div>
+            )}
+            {/* Время */}
+              <div className="text-xs mt-1.5 text-purple-100 opacity-75 flex items-center gap-1">
+                <Clock className="w-3 h-3"/>
+                {message.timestamp.toLocaleTimeString('ru-RU', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </div>
+          </div>
+        </div>
+
+        {/* Иконка справа для исходящих сообщений */}
+        {message.isOwn && (
+          <div className="bg-blue-100 p-2 rounded-full mb-1 flex-shrink-0">
+            <User className="w-5 h-5 text-blue-700"/>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -26,9 +171,9 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
   const [username, setUsername] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
-  const [msgReply, setMsgReply] = useState('')
+  const [msgReply, setMsgReply] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const operator = useRef('')
+  const operator = useRef('');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
@@ -46,10 +191,10 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
       setMessages([]);
       setIsLoggedIn(false);
       setUsername('');
+      setHasJoined(false);
     }
-  }, [isOpen]);
+  }, [isOpen, ws]);
 
-  // Функция для получения username по cookie
   async function userByCookie() {
     const session_id = getSessionId();
     if (!session_id) {
@@ -57,30 +202,33 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
       return null;
     }
 
-    // ВАЖНО: Устанавливаем куку перед запросом
-    // Браузер автоматически отправит её с запросом благодаря withCredentials: true
     setSessionCookie(session_id);
 
     try {
-      const response = await axios.get(
-        'http://localhost:8000/auth/user-by-cookie',  // Изменено с 127.0.0.1 на localhost!
+      // Замените axios на fetch для упрощения
+      const response = await fetch(
+        'http://localhost:8000/auth/user-by-cookie',
         {
-          withCredentials: true,  // Браузер отправит куки автоматически
+          credentials: 'include',
         }
       );
 
-      return response.data.username;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error fetching user');
+      }
+
+      const data = await response.json();
+      return data.username;
 
     } catch (error: any) {
-      console.error('Axios error:', error.response?.data || error.message);
-      alert(`Error: ${error.response?.data?.detail || error.message}`);
+      console.error('Fetch error:', error.message);
+      alert(`Error: ${error.message}`);
       return null;
     }
   }
 
-  // Функция для подключения к чату (вызывается при отправке формы входа)
   const connectToChat = async () => {
-    // Проверяем, что имя пользователя не пустое
     if (!username.trim()) {
       alert('Пожалуйста, введите имя пользователя');
       return;
@@ -95,82 +243,105 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
     console.log('User:', client);
     const websocket = new WebSocket(`ws://localhost:8000/clients/${client}`);
 
-    // Обработчик события: соединение установлено
     websocket.onopen = () => {
       console.log('✓ WebSocket подключен');
       setIsConnected(true);
       setHasJoined(true);
-      setIsLoggedIn(true)
+      setIsLoggedIn(true);
     };
 
-    // Обработчик события: получено сообщение от сервера
     websocket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         console.log('Получено сообщение:', data);
 
-        // ✅ Обрабатываем разные типы сообщений
         if (data.type === "operator_message") {
-          // Сообщение от оператора
           const newMessage: Message = {
             id: Date.now().toString() + Math.random(),
             message: data.message,
             username: data.from || 'Оператор',
             timestamp: new Date(),
-            isOwn: false
+            isOwn: false,
+            type: 'operator_message'
           };
-          operator.current = data.from
+          operator.current = data.from;
           setMessages(prev => [...prev, newMessage]);
 
-        } else if (data.type === "advertising" || data.type === "notify" || data.type === "bot_message" || data.type === "greeting") {
-
-          if (data.type === "greeting") {
-            data.message.forEach((msg, index) => {
+        } else if (data.type === "greeting") {
+          // Если greeting это массив
+          if (Array.isArray(data.message)) {
+            data.message.forEach((msg: string, index: number) => {
               setTimeout(() => {
                 const newMessage: Message = {
-                  id: index + Math.random(),
+                  id: (Date.now() + index).toString() + Math.random(),
                   message: msg,
-                  username: data.from || 'Оператор',
+                  username: 'Bot',
                   timestamp: new Date(),
                   isOwn: false,
-                  isButton: true
+                  isButton: true,
+                  type: 'bot_message'
                 };
                 setMessages(prev => [...prev, newMessage]);
-              }, index * 1000)
+              }, index * 1000);
             });
           } else {
             const newMessage: Message = {
               id: Date.now().toString() + Math.random(),
-              message: data.message || JSON.stringify(data),
-              username: data.from || data.type,
+              message: data.message,
+              username: 'Система',
               timestamp: new Date(),
               isOwn: false,
+              type: 'system_message',
               isButton: false
             };
             setMessages(prev => [...prev, newMessage]);
           }
 
+        } else if (data.type === "bot_message") {
+          const newMessage: Message = {
+            id: Date.now().toString() + Math.random(),
+            message: data.message,
+            username: 'Bot',
+            timestamp: new Date(),
+            isOwn: false,
+            type: 'bot_message',
+            isButton: false
+          };
+          setMessages(prev => [...prev, newMessage]);
+
+        } else if (data.type === "advertising" || data.type === "notify") {
+          const newMessage: Message = {
+            id: Date.now().toString() + Math.random(),
+            message: data.message,
+            username: 'Система',
+            timestamp: new Date(),
+            isOwn: false,
+            type: 'system',
+            isButton: false
+          };
+          setMessages(prev => [...prev, newMessage]);
+
         } else {
-          // Неизвестный тип - пытаемся отобразить как есть
           const newMessage: Message = {
             id: Date.now().toString() + Math.random(),
             message: data.message || JSON.stringify(data),
             username: data.from || 'Система',
             timestamp: new Date(),
             isOwn: false,
+            type: 'system',
             isButton: false
           };
           setMessages(prev => [...prev, newMessage]);
         }
       } catch (error) {
         console.error('Ошибка парсинга сообщения:', error);
-        // Если не JSON, показываем как текст
         const newMessage: Message = {
           id: Date.now().toString() + Math.random(),
           message: event.data,
           username: 'Система',
           timestamp: new Date(),
           isOwn: false,
+          type: 'system',
           isButton: false
         };
         setMessages(prev => [...prev, newMessage]);
@@ -187,14 +358,24 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
       setIsConnected(false);
     };
 
-    // Сохраняем объект WebSocket в состоянии
     setWs(websocket);
   };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     connectToChat();
-    setHasJoined(true)
+  };
+
+  // Обработчик клика по сообщению бота
+  const handleBotMessageClick = (botMessage: string) => {
+    if (!ws || !isConnected) return;
+
+    // Просто отправляем текст сообщения на бэкенд
+    const messageData = {
+      message: botMessage,
+      from: username,
+    };
+    ws.send(JSON.stringify(messageData));
   };
 
   const sendMessage = (e: React.FormEvent) => {
@@ -202,10 +383,9 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
 
     if (!inputValue.trim() || !ws || !isConnected) return;
 
-    // ✅ ОТПРАВЛЯЕМ JSON вместо простого текста
     const messageData = {
       message: inputValue,
-      from: username,  // Тип сообщения
+      from: username,
       to: operator.current
     };
     ws.send(JSON.stringify(messageData));
@@ -216,12 +396,12 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
       username: username,
       timestamp: new Date(),
       isOwn: true,
-      isButton: false
+      type: 'client'
     };
 
     setMessages(prev => [...prev, newMessage]);
     setInputValue('');
-    setMsgReply('')
+    setMsgReply('');
   };
 
   if (!isOpen) return null;
@@ -306,7 +486,7 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+        <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-gray-50 to-gray-100">
           {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center text-gray-400">
               <div className="text-center">
@@ -315,51 +495,19 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
               </div>
             </div>
           ) : (
-            messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                    message.isOwn
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-br-sm'
-                      : 'bg-white text-gray-800 rounded-bl-sm shadow-sm'
-                  }`}
-                >
-                  {message.username}
-                  {/* Иконка ОТДЕЛЬНО от className */}
-                  {!message.isOwn && (
-                    <ChatBubbleBottomCenterTextIcon className="h-4 w-4 text-green-600"/>
-                  )}
-                  {message.isButton ? (
-                    <button
-                      className="text-xl mt-1 text-blue-400"
-                      onClick={() => {
-                        const messageData = {
-                          message: message.message,  // текст кнопки
-                          from: username,
-                        };
-                        ws.send(JSON.stringify(messageData));
-                      }}
-                    >
-                      <span>{message.message}</span>
-                    </button>
-
-                  ) : (
-                    <div className="break-words">{message.message}</div>
-                  )}
-                  <div className={`text-xs mt-1 ${message.isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
-                    {message.timestamp.toLocaleTimeString('ru-RU', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </div>
-                </div>
-              </div>
-            ))
+            <>
+              {messages.map((message) => (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  onBotMessageClick={handleBotMessageClick}
+                  username={username}
+                  ws={ws}
+                />
+              ))}
+              <div ref={messagesEndRef}/>
+            </>
           )}
-          <div ref={messagesEndRef}/>
         </div>
 
         {/* Input */}
@@ -376,7 +524,7 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
             <button
               type="submit"
               disabled={!isConnected || !inputValue.trim()}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-disabled flex items-center gap-2"
             >
               <Send className="w-5 h-5"/>
             </button>
