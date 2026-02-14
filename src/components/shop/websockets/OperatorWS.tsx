@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Users, Wifi, WifiOff, Send, X } from 'lucide-react';
+import {useState, useEffect, useRef} from 'react';
+import {Users, Wifi, WifiOff, Send, X} from 'lucide-react';
 import axios from 'axios';
 
 // Интерфейс для описания структуры сообщения оператора
@@ -22,7 +22,7 @@ interface OperatorPanelProps {
 }
 
 // Компонент панели оператора (для общения с несколькими клиентами)
-export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
+export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
   const [messages, setMessages] = useState<ClientMessages>({});
   const [inputValue, setInputValue] = useState('');
   const [isConnected, setIsConnected] = useState(false);
@@ -50,8 +50,25 @@ export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
     } finally {
       setIsLoadingClients(false);
     }
-  };
+  }
+  useEffect(() => {
+    // Проверяем, что ws существует и подключен
+    if (ws && isConnected && allClients.length > 0 && !selectedClient) {
+      const firstClient = allClients[0];
+      setSelectedClient(firstClient);
 
+      // ✅ Дополнительная проверка перед отправкой
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          from: operatorName,
+          to: firstClient,
+          message: "Operator connected",
+        }));
+      } else {
+        console.log("WebSocket не готов, сообщение не отправлено");
+      }
+    }
+  }, [selectedClient, ws, isConnected]);
   // ✅ ИСПРАВЛЕНО: Загружаем клиентов при открытии панели
   useEffect(() => {
     if (isOpen && hasJoined) {
@@ -64,8 +81,9 @@ export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
 
   // Функция для прокрутки к последнему сообщению
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
   };
+
 
   useEffect(() => {
     scrollToBottom();
@@ -94,6 +112,7 @@ export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
       alert('Пожалуйста, введите ваше имя');
       return;
     }
+
 
     // Подключаемся к эндпоинту оператора БЕЗ клиента в URL
     const websocket = new WebSocket(`ws://localhost:8000/operator/${operatorName}`);
@@ -205,7 +224,7 @@ export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
             <div className="w-full max-w-sm">
               <div className="text-center mb-6">
                 <div className="inline-block bg-purple-100 p-4 rounded-full mb-4">
-                  <Users className="w-8 h-8 text-purple-600" />
+                  <Users className="w-8 h-8 text-purple-600"/>
                 </div>
                 <h3 className="text-2xl font-semibold text-gray-800 mb-2">
                   Панель оператора
@@ -243,18 +262,18 @@ export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
             <div className="w-72 bg-gray-50 border-r border-gray-200 flex flex-col">
               <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <Users className="w-5 h-5" />
+                  <Users className="w-5 h-5"/>
                   <h3 className="font-semibold">Панель оператора</h3>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   {isConnected ? (
                     <>
-                      <Wifi className="w-4 h-4" />
+                      <Wifi className="w-4 h-4"/>
                       <span>Онлайн ({operatorName})</span>
                     </>
                   ) : (
                     <>
-                      <WifiOff className="w-4 h-4" />
+                      <WifiOff className="w-4 h-4"/>
                       <span>Оффлайн</span>
                     </>
                   )}
@@ -269,7 +288,7 @@ export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
                   </div>
                 ) : allClients.length === 0 ? (
                   <div className="text-center text-gray-400 mt-8 px-4">
-                    <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <Users className="w-12 h-12 mx-auto mb-2 opacity-50"/>
                     <p className="text-sm">Нет активных клиентов</p>
                   </div>
                 ) : (
@@ -316,7 +335,8 @@ export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
             {/* ОСНОВНАЯ ОБЛАСТЬ ЧАТА */}
             <div className="flex-1 flex flex-col">
               {/* Шапка чата */}
-              <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 flex items-center justify-between">
+              <div
+                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 flex items-center justify-between">
                 <div>
                   {selectedClient ? (
                     <>
@@ -333,7 +353,7 @@ export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
                   onClick={onClose}
                   className="p-2 hover:bg-white/20 rounded-lg transition-colors"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5"/>
                 </button>
               </div>
 
@@ -342,7 +362,7 @@ export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
                 {!selectedClient ? (
                   <div className="h-full flex items-center justify-center text-gray-400">
                     <div className="text-center">
-                      <Users className="w-16 h-16 mx-auto mb-3 opacity-50" />
+                      <Users className="w-16 h-16 mx-auto mb-3 opacity-50"/>
                       <p>Выберите клиента из списка слева</p>
                     </div>
                   </div>
@@ -378,7 +398,7 @@ export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
                     </div>
                   ))
                 )}
-                <div ref={messagesEndRef} />
+                <div ref={messagesEndRef}/>
               </div>
 
               {/* Форма отправки */}
@@ -402,7 +422,7 @@ export function OperatorWS({ isOpen, onClose }: OperatorPanelProps) {
                       disabled={!isConnected || !inputValue.trim()}
                       className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-lg transition-all"
                     >
-                      <Send className="w-5 h-5" />
+                      <Send className="w-5 h-5"/>
                     </button>
                   </form>
                 )}

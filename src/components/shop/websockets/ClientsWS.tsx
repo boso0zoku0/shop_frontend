@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
-import { Send, X, Wifi, WifiOff, User } from 'lucide-react';
+import {useState, useEffect, useRef} from 'react';
+import {Send, X, Wifi, WifiOff, User} from 'lucide-react';
 import axios from 'axios';
-import { getSessionId, setSessionCookie } from '../cookieHelper';
+import {getSessionId, setSessionCookie} from '../cookieHelper';
+import {ChatBubbleBottomCenterTextIcon} from '@heroicons/react/24/solid'
 
 interface Message {
   id: string;
@@ -9,6 +10,7 @@ interface Message {
   username: string;
   timestamp: Date;
   isOwn: boolean;
+  isButton: boolean
 }
 
 interface ClientPanelProps {
@@ -16,7 +18,7 @@ interface ClientPanelProps {
   onClose: () => void;
 }
 
-export function ClientsWS({ isOpen, onClose }: ClientPanelProps) {
+export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isConnected, setIsConnected] = useState(false);
@@ -24,11 +26,12 @@ export function ClientsWS({ isOpen, onClose }: ClientPanelProps) {
   const [username, setUsername] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
+  const [msgReply, setMsgReply] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const operator = useRef('')
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
   };
 
   useEffect(() => {
@@ -119,27 +122,33 @@ export function ClientsWS({ isOpen, onClose }: ClientPanelProps) {
           operator.current = data.from
           setMessages(prev => [...prev, newMessage]);
 
-        } else if (data.type === "greeting") {
-          // Приветственное сообщение от системы
-          const newMessage: Message = {
-            id: Date.now().toString() + Math.random(),
-            message: data.message,
-            username: 'Система',
-            timestamp: new Date(),
-            isOwn: false
-          };
-          setMessages(prev => [...prev, newMessage]);
+        } else if (data.type === "advertising" || data.type === "notify" || data.type === "bot_message" || data.type === "greeting") {
 
-        } else if (data.type === "advertising" || data.type === "notify") {
-          // Рекламное или уведомляющее сообщение
-          const newMessage: Message = {
-            id: Date.now().toString() + Math.random(),
-            message: data.message,
-            username: 'Система',
-            timestamp: new Date(),
-            isOwn: false
-          };
-          setMessages(prev => [...prev, newMessage]);
+          if (data.type === "greeting") {
+            data.message.forEach((msg, index) => {
+              setTimeout(() => {
+                const newMessage: Message = {
+                  id: index + Math.random(),
+                  message: msg,
+                  username: data.from || 'Оператор',
+                  timestamp: new Date(),
+                  isOwn: false,
+                  isButton: true
+                };
+                setMessages(prev => [...prev, newMessage]);
+              }, index * 1000)
+            });
+          } else {
+            const newMessage: Message = {
+              id: Date.now().toString() + Math.random(),
+              message: data.message || JSON.stringify(data),
+              username: data.from || data.type,
+              timestamp: new Date(),
+              isOwn: false,
+              isButton: false
+            };
+            setMessages(prev => [...prev, newMessage]);
+          }
 
         } else {
           // Неизвестный тип - пытаемся отобразить как есть
@@ -148,7 +157,8 @@ export function ClientsWS({ isOpen, onClose }: ClientPanelProps) {
             message: data.message || JSON.stringify(data),
             username: data.from || 'Система',
             timestamp: new Date(),
-            isOwn: false
+            isOwn: false,
+            isButton: false
           };
           setMessages(prev => [...prev, newMessage]);
         }
@@ -160,19 +170,18 @@ export function ClientsWS({ isOpen, onClose }: ClientPanelProps) {
           message: event.data,
           username: 'Система',
           timestamp: new Date(),
-          isOwn: false
+          isOwn: false,
+          isButton: false
         };
         setMessages(prev => [...prev, newMessage]);
       }
     };
 
-    // Обработчик события: произошла ошибка WebSocket
     websocket.onerror = (error) => {
       console.error('WebSocket ошибка:', error);
       setIsConnected(false);
     };
 
-    // Обработчик события: соединение закрыто
     websocket.onclose = () => {
       console.log('WebSocket отключен');
       setIsConnected(false);
@@ -206,11 +215,13 @@ export function ClientsWS({ isOpen, onClose }: ClientPanelProps) {
       message: inputValue,
       username: username,
       timestamp: new Date(),
-      isOwn: true
+      isOwn: true,
+      isButton: false
     };
 
     setMessages(prev => [...prev, newMessage]);
     setInputValue('');
+    setMsgReply('')
   };
 
   if (!isOpen) return null;
@@ -225,7 +236,7 @@ export function ClientsWS({ isOpen, onClose }: ClientPanelProps) {
               onClick={onClose}
               className="hover:bg-gray-100 p-2 rounded-lg transition-colors"
             >
-              <X className="w-6 h-6 text-gray-600" />
+              <X className="w-6 h-6 text-gray-600"/>
             </button>
           </div>
 
@@ -274,12 +285,12 @@ export function ClientsWS({ isOpen, onClose }: ClientPanelProps) {
               <div className="flex items-center gap-2 text-sm">
                 {isConnected ? (
                   <>
-                    <Wifi className="w-4 h-4" />
+                    <Wifi className="w-4 h-4"/>
                     <span>Подключен ({username})</span>
                   </>
                 ) : (
                   <>
-                    <WifiOff className="w-4 h-4" />
+                    <WifiOff className="w-4 h-4"/>
                     <span>Отключен</span>
                   </>
                 )}
@@ -289,7 +300,7 @@ export function ClientsWS({ isOpen, onClose }: ClientPanelProps) {
               onClick={onClose}
               className="hover:bg-white/20 p-2 rounded-lg transition-colors"
             >
-              <X className="w-6 h-6" />
+              <X className="w-6 h-6"/>
             </button>
           </div>
         </div>
@@ -316,7 +327,28 @@ export function ClientsWS({ isOpen, onClose }: ClientPanelProps) {
                       : 'bg-white text-gray-800 rounded-bl-sm shadow-sm'
                   }`}
                 >
-                  <div className="break-words">{message.message}</div>
+                  {message.username}
+                  {/* Иконка ОТДЕЛЬНО от className */}
+                  {!message.isOwn && (
+                    <ChatBubbleBottomCenterTextIcon className="h-4 w-4 text-green-600"/>
+                  )}
+                  {message.isButton ? (
+                    <button
+                      className="text-xl mt-1 text-blue-400"
+                      onClick={() => {
+                        const messageData = {
+                          message: message.message,  // текст кнопки
+                          from: username,
+                        };
+                        ws.send(JSON.stringify(messageData));
+                      }}
+                    >
+                      <span>{message.message}</span>
+                    </button>
+
+                  ) : (
+                    <div className="break-words">{message.message}</div>
+                  )}
                   <div className={`text-xs mt-1 ${message.isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
                     {message.timestamp.toLocaleTimeString('ru-RU', {
                       hour: '2-digit',
@@ -327,7 +359,7 @@ export function ClientsWS({ isOpen, onClose }: ClientPanelProps) {
               </div>
             ))
           )}
-          <div ref={messagesEndRef} />
+          <div ref={messagesEndRef}/>
         </div>
 
         {/* Input */}
@@ -346,7 +378,7 @@ export function ClientsWS({ isOpen, onClose }: ClientPanelProps) {
               disabled={!isConnected || !inputValue.trim()}
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              <Send className="w-5 h-5" />
+              <Send className="w-5 h-5"/>
             </button>
           </div>
         </form>
