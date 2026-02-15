@@ -83,7 +83,7 @@ const MessageBubble = ({message, onBotMessageClick, username, ws}: {
     // Системные сообщения в центре
     return (
       <div className="flex justify-center my-2">
-        <div className="bg-gray-100 px-4 py-2 rounded-full shadow-sm border border-gray-200 max-w-[80%]">
+        <div className="text-white bg-blue-300 px-4 py-2 rounded-full shadow-sm border border-gray-200 max-w-[80%]">
           <div className="flex items-center gap-2">
             <Shield className="w-6 h-6 text-gray-500"/>
             <div className="break-words">{message.message}</div>
