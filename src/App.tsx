@@ -1,6 +1,5 @@
 import './App.css'
 import {BrowserRouter as Router, Route, Routes} from 'react-router-dom';
-import MainPage from "./components/shop/ListGames.tsx";
 import Genres from "./components/shop/ListGenres.tsx";
 import ActionGames from "./components/shop/GamesAction.tsx";
 import StrategyGames from "./components/shop/GamesStrategy.tsx";
@@ -10,6 +9,7 @@ import RegistrationUsers from "./components/shop/Auth/Registration.tsx";
 import LoginUsers from "./components/shop/Auth/Login.tsx";
 import VoteGames from "./components/shop/VotePost.tsx";
 import ListGames from "./components/shop/ListGames.tsx";
+import Payment from "./components/shop/payments/payment.tsx";
 
 export default function App() {
   return (
@@ -28,6 +28,8 @@ export default function App() {
             </li>
             <li className="text-sky-200 text-shadow-2xs text-shadow-sky-500 font-thick"><a href="/login">Login</a>
             </li>
+            <li className="text-sky-200 text-shadow-2xs text-shadow-sky-500 font-thick"><a href="/payment">Payment</a>
+            </li>
           </ul>
         </nav>
         <Routes>
@@ -40,6 +42,7 @@ export default function App() {
           <Route path="/games/rpg" element={<RpgGames/>}/>
           <Route path="/ws" element={<ChatWebsocket/>}/>
           <Route path="/vote/:gameParam" element={<VoteGames />}/>
+          <Route path="/payment" element={<Payment />}/>
 
         </Routes>
 
