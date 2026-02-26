@@ -12,9 +12,7 @@ interface Games {
   release_year: string;
   story?: string; // Делаем опциональным
   gallery?: string[];
-  game: string // с этого поля и ниже значение приходит от подзапроса отдельного
-  average_rating: number
-  rating_count: number
+  rating: number
   message: string
 }
 
@@ -26,31 +24,39 @@ export default function ListGames() {
 
 
   useEffect(() => {
-    axios.get('http://localhost:8000/games/get/rating/all',
+    axios.get('http://localhost:8000/games',
       {
         withCredentials: true
       }
-      )
+    )
       .then(response => {
-        setGames(response.data)})
+        setGames(response.data)
+      })
   }, []);
-
 
 
   function navigateToVote(game: string) {
     navigate(`/vote/${encodeURIComponent(game)}`)
   }
 
+  function navigateToRatings() {
+    navigate(`/ratings`)
+  }
+
 
   return (
     <div className="text-3xl bg-indigo-950 text-white p-6">
-      <div className="mb-36">
+      <div className="mb-20">
         Popular games across all genres
       </div>
-
+      <code
+        onClick={navigateToRatings}
+        className=" flex mb-10 justify-end px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer hover:bg-blue-600 active:scale-95 transition-all duration-200 select-none w-fit ml-auto">
+        Ratings
+      </code>
       <div className="space-y-16">
         {games.map((game) => (
-          <div key={game.id} className="bg-gray-900/50 p-8 rounded-2xl shadow-2xl">
+          <div key={game.name} id={encodeURIComponent(game.name)} className="bg-gray-900/50 p-8 rounded-2xl shadow-2xl">
             <div className="flex items-start gap-8 mb-8">
               {/* Левая колонка: картинка */}
               <img
@@ -75,7 +81,7 @@ export default function ListGames() {
                     <VerticalRating
                       game={game.name}
                       maxStars={5}
-                      initialValue={game.rating_count}
+                      initialValue={game.rating != null ? game.rating : 0}
                       onRate={(val) => console.log("Оценка:", val)}
                     />
                   </div>

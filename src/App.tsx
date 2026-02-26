@@ -10,6 +10,9 @@ import LoginUsers from "./components/shop/Auth/Login.tsx";
 import VoteGames from "./components/shop/VotePost.tsx";
 import ListGames from "./components/shop/ListGames.tsx";
 import Payment from "./components/shop/payments/payment.tsx";
+import MyAccount from "./components/shop/MyAccount.tsx";
+import RatingGames from "./components/shop/GamesRating.tsx";
+import MovieBanner from "./components/shop/Banner.tsx";
 
 export default function App() {
   return (
@@ -33,6 +36,7 @@ export default function App() {
           </ul>
         </nav>
         <Routes>
+          <Route path="/account" element={<MyAccount/>}/>
           <Route path="/login" element={<LoginUsers/>}/>
           <Route path="/registration" element={<RegistrationUsers/>}/>
           <Route path="/games" element={<ListGames/>}/>
@@ -42,8 +46,9 @@ export default function App() {
           <Route path="/games/rpg" element={<RpgGames/>}/>
           <Route path="/ws" element={<ChatWebsocket/>}/>
           <Route path="/vote/:gameParam" element={<VoteGames />}/>
+          <Route path="/ratings" element={<RatingGames/>}/>
           <Route path="/payment" element={<Payment />}/>
-
+          <Route path="/m" element={<MovieBanner/>}/>
         </Routes>
 
       </div>

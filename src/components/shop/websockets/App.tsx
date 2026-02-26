@@ -1,10 +1,17 @@
-import { useState } from 'react';
-import { ClientsWS } from './ClientsWS.tsx';
-import { OperatorWS } from './OperatorWS.tsx';
+import {useEffect, useState} from 'react';
+import {ClientsWS} from './ClientsWS.tsx';
+import {OperatorWS} from './OperatorWS.tsx';
+import axios from "axios";
 
 export default function ChatWebsocket() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isOperatorOpen, setIsOperatorOpen] = useState(false);
+  const [isSuperUser, setIsSuperUser] = useState(false)
+  useEffect(() => {
+    axios.get("http://localhost:8000/auth/is-super-user", {withCredentials: true}).then((resp) => {
+      setIsSuperUser(resp.data)
+    })
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
@@ -19,19 +26,21 @@ export default function ChatWebsocket() {
         </div>
 
         <div className="flex gap-4 justify-center mb-8">
-          <button
-            onClick={() => setIsChatOpen(true)}
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 text-lg font-semibold"
-          >
-            👤 Войти как клиент
-          </button>
-
-          <button
-            onClick={() => setIsOperatorOpen(true)}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 text-lg font-semibold"
-          >
-            👨‍💼 Войти как оператор
-          </button>
+          {isSuperUser ? (
+            <button
+              onClick={() => setIsOperatorOpen(true)}
+              className="bg-gradient-to-r from-red-400 to-indigo-600 hover:from-red-700 hover:to-indigo-700 text-white px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 text-lg font-semibold"
+            >
+              👨‍💼 Войти как оператор
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsChatOpen(true)}
+              className="bg-gradient-to-r from-indigo-600 to-red-400 hover:from-blue-700 hover:to-red-600 text-white px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 text-lg font-semibold"
+            >
+              👤 Войти как клиент
+            </button>
+          )}
         </div>
 
         <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
