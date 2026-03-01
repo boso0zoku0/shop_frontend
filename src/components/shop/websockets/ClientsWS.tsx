@@ -1,6 +1,8 @@
 import React, {useState, useEffect, useRef} from 'react';
-import {X, Send, Wifi, WifiOff, UserCircle2, Bot, Shield, User, Clock} from 'lucide-react';
+import {X, Send, Wifi, WifiOff, UserCircle2, Bot, Shield, User, Clock, FileUser, Paperclip, Video} from 'lucide-react';
 import {getSessionId, setSessionCookie} from "../cookieHelper.tsx";
+import {ClientMessageBubble} from "./clientMessageBubble.tsx"
+import axios from "axios";
 
 interface Message {
   id: string;
@@ -9,7 +11,11 @@ interface Message {
   timestamp: Date;
   isOwn: boolean;
   isButton?: boolean;
-  type?: string; // 'system', 'bot', 'operator', 'client'
+  type?: string; // 'system', 'bot', 'operator', 'client', 'media'
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: string;
+  mimeType?: string
 }
 
 interface ClientPanelProps {
@@ -18,150 +24,6 @@ interface ClientPanelProps {
   ws: WebSocket
 
 }
-
-
-// Компонент для отображения одного сообщения
-const MessageBubble = ({message, onBotMessageClick, username, ws}: {
-  message: Message;
-  onBotMessageClick?: (text: string) => void;
-}) => {
-  // Определяем тип отправителя
-  const getSenderType = () => {
-    if (message.isOwn) return 'client_message';
-    if (message.username === 'Система' || message.type === 'greeting' || message.type === 'advertising') return 'system_message';
-    if (message.username === 'Bot' || message.type === 'bot_message') return 'bot_message';
-    return 'operator_message'; // По умолчанию - оператор
-  };
-
-  const senderType = getSenderType();
-
-  // Стили для разных типов отправителей
-  const styles = {
-    client_message: {
-      container: 'justify-end',
-      bubble: 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-br-sm',
-      icon: null,
-      iconBg: '',
-      textColor: 'text-white',
-      timeColor: 'text-blue-100'
-    },
-    operator_message: {
-      container: 'justify-start',
-      bubble: 'bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-bl-sm shadow-md',
-      icon: <UserCircle2 className="w-5 h-5"/>,
-      iconBg: 'bg-purple-100',
-      textColor: 'text-white',
-      timeColor: 'text-purple-100'
-    },
-    bot_message: {
-      container: 'justify-start',
-      bubble: 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-bl-sm shadow-md cursor-pointer hover:from-emerald-600 hover:to-teal-600 transition-all',
-      icon: <Bot className="w-5 h-5 text-emerald-700"/>,
-      iconBg: 'bg-emerald-100',
-      textColor: 'text-white',
-      timeColor: 'text-emerald-100'
-    },
-    system_message: {
-      container: 'justify-center',
-      bubble: 'bg-gray-100 text-gray-700 rounded-lg shadow-sm border border-gray-200',
-      icon: <Shield className="w-4 h-4 text-gray-500"/>,
-      iconBg: 'bg-gray-50',
-      textColor: 'text-gray-700',
-      timeColor: 'text-gray-500'
-    }
-  };
-
-  const style = styles[senderType];
-
-  const handleBotClick = () => {
-    if (senderType === 'bot_message' && onBotMessageClick) {
-      onBotMessageClick(message.message);
-    }
-  };
-
-  if (senderType === 'system_message') {
-    // Системные сообщения в центре
-    return (
-      <div className="flex justify-center my-2">
-        <div className="text-white bg-blue-300 px-4 py-2 rounded-full shadow-sm border border-gray-200 max-w-[80%]">
-          <div className="flex items-center gap-2">
-            <Shield className="w-6 h-6 text-gray-500"/>
-            <div className="break-words">{message.message}</div>
-            <div className="text-xs mt-1.5 text-purple-100 opacity-75 flex items-center gap-1">
-              <Clock className="w-3 h-3"/>
-              {message.timestamp.toLocaleTimeString('ru-RU', {
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`flex ${style.container} mb-3`}>
-      <div className="flex items-end gap-2 max-w-[70%]">
-        {/* Иконка слева для входящих сообщений */}
-        {!message.isOwn && style.icon && (
-          <div className={`${style.iconBg} p-2 rounded-full mb-1 flex-shrink-0`}>
-            {style.icon}
-          </div>
-        )}
-
-        {/* Сообщение */}
-        <div>
-          {/* Имя отправителя (для входящих) */}
-          {!message.isOwn && (
-            <div className="text-xs text-gray-500 mb-1 ml-1">
-              {message.username}
-            </div>
-          )}
-
-          {/* Пузырь сообщения */}
-          <div
-            className={`px-4 py-3 rounded-2xl ${style.bubble}`}
-            onClick={handleBotClick}
-          >
-            {message.isButton ? (
-              <button
-                className="text-left hover:no-underline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Отправляем текст кнопки на бэк
-                  const messageData = {
-                    message: message.message,
-                    from: username, // или ваш текущий пользователь
-                  };
-                  ws.send(JSON.stringify(messageData));
-                }}
-              > {message.message}
-              </button>
-            ) : (
-              <div className="break-words">{message.message}</div>
-            )}
-            {/* Время */}
-              <div className="text-xs mt-1.5 text-purple-100 opacity-75 flex items-center gap-1">
-                <Clock className="w-3 h-3"/>
-                {message.timestamp.toLocaleTimeString('ru-RU', {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </div>
-          </div>
-        </div>
-
-        {/* Иконка справа для исходящих сообщений */}
-        {message.isOwn && (
-          <div className="bg-blue-100 p-2 rounded-full mb-1 flex-shrink-0">
-            <User className="w-5 h-5 text-blue-700"/>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -172,8 +34,12 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
   const [msgReply, setMsgReply] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const operator = useRef('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
@@ -181,7 +47,16 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, inputValue]);
+
+  // Очистка превью при размонтировании
+  useEffect(() => {
+    return () => {
+      if (filePreview) {
+        URL.revokeObjectURL(filePreview);
+      }
+    };
+  }, [filePreview]);
 
   useEffect(() => {
     if (!isOpen && ws) {
@@ -239,8 +114,6 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
       alert('Не удалось получить данные пользователя');
       return;
     }
-
-    console.log('User:', client);
     const websocket = new WebSocket(`ws://localhost:8000/clients/${client}`);
 
     websocket.onopen = () => {
@@ -266,6 +139,20 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
           };
           operator.current = data.from;
           setMessages(prev => [...prev, newMessage]);
+        } else if (data.type === "media") {
+          console.log(data.type)
+          const newMessage: Message = {
+            id: Date.now().toString() + Math.random(),
+            message: data.message,
+            username: data.from || 'Оператор',
+            timestamp: new Date(),
+            isOwn: false,
+            type: 'media',
+            mimeType: data.mime_type,
+            fileUrl: data.file_url
+          }
+          operator.current = data.from;
+          setMessages(prev => [...prev, newMessage])
 
         } else if (data.type === "greeting") {
           // Если greeting это массив
@@ -378,16 +265,104 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
     ws.send(JSON.stringify(messageData));
   };
 
-  const sendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Обработчик выбора файла
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
 
-    if (!inputValue.trim() || !ws || !isConnected) return;
+    if (!file) return;
 
-    const messageData = {
-      message: inputValue,
-      from: username,
-      to: operator.current
+    // Проверка размера файла (макс 10MB)
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      alert('Файл слишком большой. Максимальный размер: 50MB');
+      return;
+    }
+
+    // Проверка типа файла
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm'];
+    if (!validTypes.includes(file.type)) {
+      alert('Неподдерживаемый формат файла. Используйте: JPEG, PNG, GIF, WebP, MP4, WebM');
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Создаем превью
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setFilePreview(event.target?.result as string);
     };
+    reader.readAsDataURL(file);
+  };
+
+  // Отмена выбора файла
+  const handleCancelFile = () => {
+    setSelectedFile(null);
+    if (filePreview) {
+      URL.revokeObjectURL(filePreview);
+    }
+    setFilePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Загрузка файла на сервер
+  const uploadFile = async (file: File): Promise<{ url: string; type: 'image' | 'video' } | null> => {
+    try {
+      setIsUploading(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await axios.post("http://localhost:8000/media/upload-file", formData, {withCredentials: true})
+      return {
+        url: response.data.file_url,
+        type: response.data.mime_type,
+      };
+    } catch (error) {
+      console.error('Ошибка загрузки файла:', error);
+      alert('Не удалось загрузить файл');
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ws || !isConnected) return;
+
+    let mediaUrl: string | undefined;
+    let mediaType: string | undefined;
+
+    if (selectedFile) {
+      const uploadResult = await uploadFile(selectedFile);
+      if (uploadResult) {
+        mediaUrl = uploadResult.url;
+        mediaType = uploadResult.type;
+      } else {
+        // Если загрузка не удалась, не отправляем сообщение
+        return;
+      }
+    }
+
+    // Проверяем, есть ли текст или медиа
+    if (!inputValue.trim() && !mediaUrl) {
+      return;
+    }
+
+    const messageData: any = {
+      message: inputValue || '',
+      from: username,
+      to: operator.current,
+    };
+
+    // Добавляем информацию о медиа, если есть
+    if (mediaUrl && mediaType) {
+      messageData.file_url = mediaUrl;
+      messageData.mime_type = mediaType;
+    }
+
     ws.send(JSON.stringify(messageData));
 
     const newMessage: Message = {
@@ -396,12 +371,15 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
       username: username,
       timestamp: new Date(),
       isOwn: true,
-      type: 'client'
+      type: 'client',
+      fileUrl: mediaUrl,
+      mimeType: mediaType,
     };
 
     setMessages(prev => [...prev, newMessage]);
     setInputValue('');
     setMsgReply('');
+    handleCancelFile()
   };
 
   if (!isOpen) return null;
@@ -455,78 +433,121 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl h-[600px] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4">
-          <div className="flex items-center justify-between">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col">
+        {/* Шапка чата */}
+        <div
+          className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 rounded-t-2xl flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-full">
+              <User className="w-6 h-6"/>
+            </div>
             <div>
-              <h3 className="font-semibold text-lg">Чат поддержки</h3>
-              <div className="flex items-center gap-2 text-sm">
-                {isConnected ? (
-                  <>
-                    <Wifi className="w-4 h-4"/>
-                    <span>Подключен ({username})</span>
-                  </>
-                ) : (
-                  <>
-                    <WifiOff className="w-4 h-4"/>
-                    <span>Отключен</span>
-                  </>
-                )}
-              </div>
+              <h3 className="font-semibold">{username}</h3>
+              <p className="text-sm text-purple-100">
+                {isConnected ? '✓ Подключен' : '✗ Не подключен'}
+              </p>
             </div>
-            <button
-              onClick={onClose}
-              className="hover:bg-white/20 p-2 rounded-lg transition-colors"
-            >
-              <X className="w-6 h-6"/>
-            </button>
           </div>
+          <button
+            onClick={onClose}
+            className="hover:bg-white/20 p-2 rounded-full transition-colors"
+          >
+            <X className="w-6 h-6"/>
+          </button>
         </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-gray-50 to-gray-100">
-          {messages.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-gray-400">
-              <div className="text-center">
-                <div className="text-4xl mb-2">💬</div>
-                <p>Начните диалог с оператором</p>
+        {/* Область сообщений */}
+        <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-purple-50 to-white">
+          {messages.map((msg) => (
+            <ClientMessageBubble
+              key={msg.id}
+              message={msg}
+              onBotMessageClick={handleBotMessageClick}
+              username={username}
+              ws={ws}
+            />
+          ))}
+          <div ref={messagesEndRef}/>
+        </div>
+
+        {/* Превью выбранного файла */}
+        {selectedFile && filePreview && (
+          <div className="px-4 py-2 bg-gray-50 border-t border-gray-200">
+            <div className="flex items-center gap-3 bg-white p-2 rounded-lg">
+              <div className="relative">
+                {selectedFile.type.startsWith('image/') ? (
+                  <img
+                    src={filePreview}
+                    alt="Preview"
+                    className="w-16 h-16 object-cover rounded"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
+                    <Video className="w-8 h-8 text-gray-600"/>
+                  </div>
+                )}
+                <button
+                  onClick={handleCancelFile}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                >
+                  <X className="w-3 h-3"/>
+                </button>
+              </div>
+              <div className="flex-1 text-sm">
+                <p className="font-medium text-gray-800 truncate">
+                  {selectedFile.name}
+                </p>
+                <p className="text-gray-500">
+                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                </p>
               </div>
             </div>
-          ) : (
-            <>
-              {messages.map((message) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  onBotMessageClick={handleBotMessageClick}
-                  username={username}
-                  ws={ws}
-                />
-              ))}
-              <div ref={messagesEndRef}/>
-            </>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Input */}
-        <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200">
+        {/* Форма ввода */}
+        <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200 rounded-b-2xl">
           <div className="flex gap-2">
+            {/* Кнопка выбора файла */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              onChange={handleFileSelect}
+              className="hidden"
+              id="file-input"
+            />
+            <label
+              htmlFor="file-input"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 p-3 rounded-lg cursor-pointer transition-colors flex items-center justify-center"
+            >
+              <Paperclip className="w-5 h-5"/>
+            </label>
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Напишите сообщение..."
+              placeholder={selectedFile ? 'Добавьте сообщение к фото' : 'Введите сообщение'}
               disabled={!isConnected}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900"
-            />
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900"/>
+            {/* Кнопка отправки */}
             <button
               type="submit"
-              disabled={!isConnected || !inputValue.trim()}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-disabled flex items-center gap-2"
+              disabled={(!inputValue.trim() && !selectedFile) || !isConnected || isUploading}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              <Send className="w-5 h-5"/>
+              {isUploading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"/>
+                  Загрузка...
+                </>
+              ) : (
+                <>
+                  <Send className="w-5 h-5"/>
+                  Отправить
+                </>
+              )}
             </button>
           </div>
         </form>
