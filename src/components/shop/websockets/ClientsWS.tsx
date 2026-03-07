@@ -1,6 +1,6 @@
 import React, {useState, useEffect, useRef} from 'react';
 import {X, Send, Wifi, WifiOff, UserCircle2, Bot, Shield, User, Clock, FileUser, Paperclip, Video} from 'lucide-react';
-import {getSessionId, setSessionCookie} from "../cookieHelper.tsx";
+import {getSessionId, setSessionCookie} from "../helpers/cookieHelper.tsx";
 import {ClientMessageBubble} from "./clientMessageBubble.tsx"
 import axios from "axios";
 
@@ -44,10 +44,47 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
   };
+// from_user_id
+// to_user_id
+// message
+// file_url
+// mime_type
+// type_message
 
+
+
+  //   message: string;
+  // username: string;
+  // timestamp: Date;
+  // isOwn: boolean;
+  // isButton?: boolean;
+  // type?: string; // 'system', 'bot', 'operator', 'client', 'media'
+  // fileUrl?: string;
+  // fileName?: string;
+  // fileSize?: string;
+  // mimeType?: string
   useEffect(() => {
     scrollToBottom();
   }, [messages, inputValue]);
+
+  useEffect(() => {
+  axios.get("http://localhost:8000/get-user-dialog", {withCredentials: true})
+    .then((response) => {
+      const messageTransform = response.data.map((data) => ({
+        id: data.id,
+        message: data.message,
+        username: data.username,
+        timestamp: new Date(data.created_at),
+        isOwn: true,
+        type: data.type_message
+      }))
+      setMessages(messageTransform)
+    })
+
+    .catch(error => {
+      console.error('Ошибка загрузки истории:', error);
+    });
+}, []);
 
   // Очистка превью при размонтировании
   useEffect(() => {

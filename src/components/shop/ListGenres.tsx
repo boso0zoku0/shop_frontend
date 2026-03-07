@@ -3,7 +3,7 @@ import {useEffect, useState} from "react";
 import axios from "axios";
 import {useNavigate} from "react-router-dom";
 import type {Games} from "./GamesAction.tsx";
-import {getSessionId} from "./cookieHelper.tsx";
+import {getSessionId} from "./helpers/cookieHelper.tsx";
 
 
 async function fetchGamesByGenre(genre: string): Promise<Games[]> {

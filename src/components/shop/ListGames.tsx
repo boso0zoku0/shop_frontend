@@ -1,8 +1,8 @@
 import {useEffect, useRef, useState} from "react";
-import axios from "axios";
 import FilmGallery from "./Gallery.tsx";
 import {useNavigate} from "react-router-dom";
 import VerticalRating from "./GameRatingProps.tsx";
+import {useGetGames} from "./helpers/reqGames.tsx";
 
 interface Games {
   average_rating: number;
@@ -18,21 +18,32 @@ interface Games {
 
 
 export default function ListGames() {
-  const [games, setGames] = useState<Games[]>([]);
   const [expandedFilmId, setExpandedFilmId] = useState<number | null>(null);
   const navigate = useNavigate()
+  const [games, setGames] = useState<Games[]>([]);
+  const {data: gamesData} = useGetGames();
 
 
   useEffect(() => {
-    axios.get('http://localhost:8000/games',
-      {
-        withCredentials: true
-      }
-    )
-      .then(response => {
-        setGames(response.data)
+    if (gamesData) {
+      setGames(gamesData);
+    }
+  }, [gamesData]);
+  // Обработчик успешной оценки
+  const handleRatingSuccess = (updatedGameData: any) => {
+    setGames(prevGames =>
+      prevGames.map(game => {
+        if (game.name === updatedGameData.game) {
+          return {
+            ...game,
+            average_rating: updatedGameData.average_rating,
+            rating_count: updatedGameData.rating_count,
+          };
+        }
+        return game;
       })
-  }, []);
+    );
+  };
 
 
   function navigateToVote(game: string) {
@@ -73,7 +84,7 @@ export default function ListGames() {
                   <button
                     className={"mt-4 px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg"}
                     onClick={() => navigateToVote(game.name)}
-                  >Go To Vote!
+                  >history of game
                   </button>
                   {/* Рейтинг справа от названия */}
                   <div className="flex items-center">
@@ -83,6 +94,7 @@ export default function ListGames() {
                       maxStars={5}
                       initialValue={game.rating != null ? game.rating : 0}
                       onRate={(val) => console.log("Оценка:", val)}
+                      onSuccess={handleRatingSuccess}
                     />
                   </div>
                 </div>

@@ -82,6 +82,7 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
       console.log('✓ Оператор подключен');
       setIsConnected(true);
       setIsLoggedIn(true);
+      setClients([])
       loadClients();
     };
 
@@ -90,7 +91,7 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
         const data = JSON.parse(event.data);
         console.log('Получено сообщение:', data);
 
-        if (data.type === 'client_message' || data.from && !data.file_url && !data.media_url) {
+        if (data.type === 'client_message' && !data.file_url && !data.media_url) {
           const newMessage: Message = {
             id: Date.now().toString() + Math.random(),
             message: data.message || '',
@@ -112,6 +113,38 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
               )
             );
           }
+        }
+        if (data.type == "notify_connect") {
+          console.log('🔔 Новый клиент:', data.from);
+          const newClient = data.from
+
+          setClients(prev => {
+            const exists = prev.some(c => c.username === data.from);
+            if (exists) {
+              console.log('Клиент уже есть в списке');
+              return prev;
+            }
+            console.log('➕ Добавляем нового клиента:', data.from);
+            return [...prev, {
+              username: newClient,
+              isActive: true,
+              unreadCount: 1
+            }];
+          });
+          const newMessage: Message = {
+            id: Date.now().toString() + Math.random(),
+            message: 'Новый клиент нуждается в помощи',
+            username: newClient,
+            timestamp: new Date(),
+            isOwn: false,
+            type: "notify_connect"
+          };
+
+          setMessages((prev) => ({
+            ...prev,
+            [data.from]: [...(prev[data.from] || []), newMessage],
+          }));
+          loadClients();
         } else if (data.type == "media") {
           console.log(data.type)
           const newMessage: Message = {
@@ -129,6 +162,8 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
             ...prev,
             [data.from]: [...(prev[data.from] || []), newMessage],
           }));
+        } else if (data.type == 'disconnect_client') {
+          loadClients()
         }
       } catch (error) {
         console.error('Ошибка парсинга сообщения:', error);

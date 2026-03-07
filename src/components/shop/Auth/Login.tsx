@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {Lock, User} from 'lucide-react';
 import {Link, useNavigate} from "react-router-dom";
 import axios from "axios";
-import {setSessionCookie} from "../cookieHelper.tsx";
+import {setSessionCookie} from "../helpers/cookieHelper.tsx";
 
 export default function LoginUsers( ) {
   const [username, setUsername] = useState('');

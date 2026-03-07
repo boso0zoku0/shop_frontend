@@ -13,6 +13,7 @@ import Payment from "./components/shop/payments/payment.tsx";
 import MyAccount from "./components/shop/MyAccount.tsx";
 import RatingGames from "./components/shop/GamesRating.tsx";
 import MovieBanner from "./components/shop/Banner.tsx";
+import FindGameByName from "./components/shop/GetGameByName.tsx";
 
 export default function App() {
   return (
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="/ratings" element={<RatingGames/>}/>
           <Route path="/payment" element={<Payment />}/>
           <Route path="/m" element={<MovieBanner/>}/>
+          <Route path="/find/game" element={<FindGameByName/>}/>
         </Routes>
 
       </div>

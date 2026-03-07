@@ -1,6 +1,6 @@
 import FilmGallery from "./Gallery.tsx";
-import {useEffect, useState} from "react";
-import axios from "axios";
+import {useState} from "react";
+import {useGetGenreStrategy} from "./helpers/GetByGenre.tsx";
 
 export interface Games {
   id: number;
@@ -13,28 +13,10 @@ export interface Games {
 
 
 export default function StrategyGames() {
-  const [games, setGames] = useState<Games[]>([]);
   const [expandedFilmId, setExpandedFilmId] = useState<number | null>(null);
+  const {data} = useGetGenreStrategy()
+  const games = data || []
 
-
-  useEffect(() => {
-    async function fetchGames() {
-      try {
-        const response = await axios.get("http://localhost:8000/games/watch/genre/strategy",
-          {
-            withCredentials: true
-          });
-        setGames(response.data);
-        console.log(response.data)
-      } catch (error) {
-        console.error("Error fetching films:", error);
-        setGames([]); // Устанавливаем пустой массив при ошибке
-      } finally {
-      }
-    }
-
-    fetchGames();
-  }, []);
 
   return (
     <div className="text-3xl bg-indigo-950 text-white p-6">
