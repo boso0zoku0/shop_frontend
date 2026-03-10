@@ -44,29 +44,14 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
   };
-// from_user_id
-// to_user_id
-// message
-// file_url
-// mime_type
-// type_message
 
-
-
-  //   message: string;
-  // username: string;
-  // timestamp: Date;
-  // isOwn: boolean;
-  // isButton?: boolean;
-  // type?: string; // 'system', 'bot', 'operator', 'client', 'media'
-  // fileUrl?: string;
-  // fileName?: string;
-  // fileSize?: string;
-  // mimeType?: string
   useEffect(() => {
     scrollToBottom();
   }, [messages, inputValue]);
 
+  useEffect(() => {
+  console.log('🔄 Ререндер!');
+});
   useEffect(() => {
   axios.get("http://localhost:8000/get-user-dialog", {withCredentials: true})
     .then((response) => {
@@ -192,7 +177,6 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
           setMessages(prev => [...prev, newMessage])
 
         } else if (data.type === "greeting") {
-          // Если greeting это массив
           if (Array.isArray(data.message)) {
             data.message.forEach((msg: string, index: number) => {
               setTimeout(() => {
@@ -245,7 +229,20 @@ export function ClientsWS({isOpen, onClose}: ClientPanelProps) {
           };
           setMessages(prev => [...prev, newMessage]);
 
-        } else {
+        } else if (data.type == "notify_connect_to_client") {
+          const newMessage: Message = {
+            id: Date.now().toString() + Math.random(),
+            message: data.message,
+            username: 'Система',
+            timestamp: new Date(),
+            isOwn: false,
+            type: 'system',
+            isButton: false
+          };
+          setMessages(prev => [...prev, newMessage]);
+
+        }
+        else {
           const newMessage: Message = {
             id: Date.now().toString() + Math.random(),
             message: data.message || JSON.stringify(data),

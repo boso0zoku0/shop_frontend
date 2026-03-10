@@ -48,10 +48,13 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
   };
-
+  useEffect(() => {
+  console.log('🔄 Ререндер оператор!');
+});
   useEffect(() => {
     scrollToBottom();
   }, [messages, selectedClient]);
+
 
   useEffect(() => {
     if (!isOpen && ws) {
@@ -83,7 +86,6 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
       setIsConnected(true);
       setIsLoggedIn(true);
       setClients([])
-      loadClients();
     };
 
     websocket.onmessage = (event) => {
@@ -162,7 +164,7 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
             ...prev,
             [data.from]: [...(prev[data.from] || []), newMessage],
           }));
-        } else if (data.type == 'disconnect_client') {
+        } else if (data.type == 'notify_disconnect') {
           loadClients()
         }
       } catch (error) {
@@ -204,6 +206,14 @@ export function OperatorWS({isOpen, onClose}: OperatorPanelProps) {
   // Выбор клиента
   const selectClient = (clientName: string) => {
     setSelectedClient(clientName);
+    const messageData: any = {
+      type: "notify_connect_to_client",
+      from: operatorName,
+      to: clientName,
+    };
+    console.log(`До отправки уведомления клиенту`)
+    ws.send(JSON.stringify(messageData));
+    console.log(`msg data: ${JSON.stringify(messageData)}`)
     // Сбрасываем счетчик непрочитанных
     setClients((prev) =>
       prev.map((c) => (c.username === clientName ? {...c, unreadCount: 0} : c))
